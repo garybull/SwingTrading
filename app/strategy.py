@@ -6,12 +6,10 @@ def generate_signal(df, symbol, spy_df=None):
     if len(df) < 100:
         return None
 
-    price = df["Close"].iloc[-1]
-
-    # ✅ USE PRECOMPUTED VALUES
-    ma50 = df["ma50"].iloc[-1]
-    ma20 = df["ma20"].iloc[-1]
-    atr = df["atr"].iloc[-1]
+    price = float(df["Close"].iloc[-1])
+    ma50 = float(df["ma50"].iloc[-1])
+    ma20 = float(df["ma20"].iloc[-1])
+    atr = float(df["atr"].iloc[-1])
 
     if pd.isna(ma50) or pd.isna(ma20) or pd.isna(atr):
         return None

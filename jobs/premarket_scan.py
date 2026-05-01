@@ -32,7 +32,11 @@ def load_data():
     data = {}
 
     for symbol in UNIVERSE:
-        df = yf.download(symbol, period="6mo", interval="1d", progress=False)
+        df = yf.download(symbol, period="6mo", interval="1d", auto_adjust=True, progress=False)
+
+        # 🔥 FIX: flatten multi-index if present
+        if hasattr(df.columns, "levels"):
+            df.columns = df.columns.get_level_values(0)
 
         if df is not None and not df.empty:
             data[symbol] = df
