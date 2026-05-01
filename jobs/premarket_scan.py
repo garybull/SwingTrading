@@ -21,9 +21,23 @@ MAX_POSITION_PCT = 0.20   # 🔥 cap any one position at 20%
 # =========================
 # LOAD DATA
 # =========================
+import yfinance as yf
+
+UNIVERSE = [
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL",
+    "META", "TSLA", "AMD", "AVGO", "NFLX"
+]
+
 def load_data():
-    with open(CACHE_FILE, "rb") as f:
-        return pickle.load(f)
+    data = {}
+
+    for symbol in UNIVERSE:
+        df = yf.download(symbol, period="6mo", interval="1d", progress=False)
+
+        if df is not None and not df.empty:
+            data[symbol] = df
+
+    return data
 
 
 # =========================
