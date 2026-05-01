@@ -1,1 +1,4 @@
 trading_system.db
+venv/
+*.db
+venv/
