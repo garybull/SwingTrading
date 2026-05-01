@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Trade History</h2>
+
+<table border="1">
+<tr>
+    <th>Symbol</th>
+    <th>Entry</th>
+    <th>Exit</th>
+    <th>PnL</th>
+    <th>R</th>
+</tr>
+
+{% for t in trades %}
+<tr>
+    <td>{{ t.symbol }}</td>
+    <td>{{ t.entry }}</td>
+    <td>{{ t.exit }}</td>
+    <td>{{ t.pnl }}</td>
+    <td>{{ t.r }}</td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

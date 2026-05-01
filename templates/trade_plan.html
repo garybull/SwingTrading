@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+    <h2>📋 Trade Plan (Execute at Open)</h2>
+
+    <table>
+        <tr>
+            <th>Symbol</th>
+            <th>Score</th>
+            <th>Entry</th>
+            <th>Stop</th>
+            <th>Shares</th>
+            <th>Weight</th>
+        </tr>
+
+        {% for t in trades %}
+        <tr style="
+            {% if loop.index <= 2 %}
+                background-color:#064e3b;
+            {% elif t.weight > 1.3 %}
+                background-color:#033a2c;
+            {% endif %}
+        ">
+            <td>{{ t.symbol }}</td>
+            <td>{{ "%.2f"|format(t.score) }}</td>
+            <td>{{ "%.2f"|format(t.entry) }}</td>
+            <td>{{ "%.2f"|format(t.stop) }}</td>
+            <td>{{ t.shares }}</td>
+            <td>{{ "%.2f"|format(t.weight) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+    <h2>🧠 System Status</h2>
+    <div id="status_text">Idle</div>
+    <div id="spinner" style="display:none;">⏳ Running scan...</div>
+    <br>
+    <button onclick="runScan()">🚀 Run Scan</button>
+</div>
+
+<div class="card">
+    <h2>🏆 Top Signals</h2>
+
+    <table>
+        <tr>
+            <th>Symbol</th>
+            <th>Score</th>
+            <th>Entry</th>
+            <th>Stop</th>
+            <th>Shares</th>
+            <th>Weight</th>
+        </tr>
+
+        {% for r in top5 %}
+        <tr style="
+            {% if loop.index <= 2 %}
+                background-color:#064e3b;
+            {% elif r.weight > 1.3 %}
+                background-color:#033a2c;
+            {% endif %}
+        ">
+            <td>{{ r.symbol }}</td>
+            <td>{{ "%.2f"|format(r.score) }}</td>
+            <td>{{ "%.2f"|format(r.entry) }}</td>
+            <td>{{ "%.2f"|format(r.stop) }}</td>
+            <td>{{ r.shares }}</td>
+            <td>{{ "%.2f"|format(r.weight) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+<script>
+    function runScan() {
+        fetch("/run_scan");
+    }
+
+    function updateStatus() {
+        fetch("/scan_status")
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById("status_text").innerText = d.message;
+                document.getElementById("spinner").style.display = d.running ? "block" : "none";
+            });
+    }
+
+    setInterval(updateStatus, 2000);
+    updateStatus();
+</script>
+
+{% endblock %}

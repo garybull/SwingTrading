@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+    <h2>📊 Open Positions</h2>
+
+    <table>
+        <tr>
+            <th>Symbol</th>
+            <th>Entry</th>
+            <th>Current</th>
+            <th>Shares</th>
+            <th>P&L ($)</th>
+            <th>P&L (%)</th>
+            <th>Stop</th>
+            <th>Action</th>
+        </tr>
+
+        {% for p in positions %}
+        <tr>
+            <td>{{ p.symbol }}</td>
+            <td>{{ "%.2f"|format(p.entry) }}</td>
+            <td>{{ "%.2f"|format(p.price) }}</td>
+            <td>{{ p.shares }}</td>
+
+            <td style="color:
+                {% if p.pnl > 0 %}#22c55e{% elif p.pnl < 0 %}#ef4444{% endif %}">
+                {{ "%.2f"|format(p.pnl) }}
+            </td>
+
+            <td style="color:
+                {% if p.pnl_pct > 0 %}#22c55e{% elif p.pnl_pct < 0 %}#ef4444{% endif %}">
+                {{ "%.2f"|format(p.pnl_pct) }}%
+            </td>
+
+            <td>{{ "%.2f"|format(p.stop) }}</td>
+
+            <td>
+                <form action="/close_trade" method="POST">
+                    <input type="hidden" name="symbol" value="{{ p.symbol }}">
+                    <input type="hidden" name="exit_price" value="{{ p.price }}">
+                    <button type="submit">Close</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+<script>
+    setTimeout(() => location.reload(), 10000); // auto refresh every 10s
+</script>
+
+{% endblock %}
