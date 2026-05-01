@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 import numpy as np
-import pickle
+import yfinance as yf
 
 from app.strategy import generate_signal
 
@@ -9,40 +9,18 @@ from app.strategy import generate_signal
 # CONFIG
 # =========================
 DB_PATH = "trading_system.db"
-CACHE_FILE = "backtest_cache.pkl"
 
 START_CAPITAL = 90000
 BASE_RISK = 0.015
 
-MAX_RESULTS = 10          # 🔥 focus on best trades
-MAX_POSITION_PCT = 0.20   # 🔥 cap any one position at 20%
-
-
-# =========================
-# LOAD DATA
-# =========================
-import yfinance as yf
+MAX_RESULTS = 10
+MAX_POSITION_PCT = 0.20
 
 UNIVERSE = [
     "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL",
-    "META", "TSLA", "AMD", "AVGO", "NFLX"
+    "META", "TSLA", "AMD", "AVGO", "NFLX",
+    "SPY", "QQQ"
 ]
-
-def load_data():
-    data = {}
-
-    for symbol in UNIVERSE:
-        df = yf.download(symbol, period="6mo", interval="1d", auto_adjust=True, progress=False)
-
-        # 🔥 FIX: flatten multi-index if present
-        if hasattr(df.columns, "levels"):
-            df.columns = df.columns.get_level_values(0)
-
-        if df is not None and not df.empty:
-            data[symbol] = df
-
-    return data
-
 
 # =========================
 # POSITION SIZE
@@ -58,7 +36,7 @@ def calc_size(capital, entry, stop, risk_pct):
 
 
 # =========================
-# WEIGHTS (PRIORITIZATION)
+# WEIGHTS
 # =========================
 def compute_weights(signals):
     scores = np.array([s["score"] for s in signals])
@@ -74,38 +52,10 @@ def compute_weights(signals):
     for s in signals:
         z = (s["score"] - mean) / std
         weight = 1 + (z * 0.25)
-
-        # clamp range
         weight = max(0.5, min(1.5, weight))
-
         weights.append(weight)
 
     return weights
-
-
-# =========================
-# DEDUPE (FIXED)
-# =========================
-def dedupe(signals):
-    seen = set()
-    result = []
-
-    for s in signals:
-        sym = s["symbol"]
-
-        # normalize duplicates
-        if sym in ["GOOG", "GOOGL"]:
-            key = "GOOG"
-        else:
-            key = sym
-
-        if key in seen:
-            continue
-
-        seen.add(key)
-        result.append(s)
-
-    return result
 
 
 # =========================
@@ -138,6 +88,45 @@ def write_results(results):
 
 
 # =========================
+# LOAD DATA (FIXED)
+# =========================
+def load_data():
+    data = {}
+
+    for symbol in UNIVERSE:
+        try:
+            df = yf.download(
+                symbol,
+                period="6mo",
+                interval="1d",
+                auto_adjust=True,
+                progress=False
+            )
+
+            if df is None or df.empty:
+                continue
+
+            # 🔥 FIX: flatten multi-index
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+
+            # 🔥 Ensure required columns
+            required = ["Open", "High", "Low", "Close"]
+            if not all(col in df.columns for col in required):
+                continue
+
+            # 🔥 Force numeric
+            df = df.astype(float)
+
+            data[symbol] = df
+
+        except Exception as e:
+            print(f"⚠️ Error loading {symbol}: {e}")
+
+    return data
+
+
+# =========================
 # MAIN SCAN
 # =========================
 def run(return_results=False):
@@ -147,9 +136,6 @@ def run(return_results=False):
     data = load_data()
     signals = []
 
-    # =========================
-    # GENERATE SIGNALS
-    # =========================
     for symbol, df in data.items():
 
         if len(df) < 100:
@@ -157,7 +143,7 @@ def run(return_results=False):
 
         df = df.copy()
 
-        # indicators (must match strategy)
+        # Indicators
         df["ma50"] = df["Close"].rolling(50).mean()
         df["ma20"] = df["Close"].rolling(20).mean()
 
@@ -169,7 +155,6 @@ def run(return_results=False):
 
         df["atr"] = tr.rolling(14).mean()
 
-        # no lookahead
         sig = generate_signal(df.iloc[:-1], symbol, None)
 
         if sig:
@@ -184,17 +169,11 @@ def run(return_results=False):
                 "strong": False
             })
 
-    # =========================
-    # CLEAN + SORT
-    # =========================
-    signals = dedupe(signals)
+    # Sort + limit
     signals = sorted(signals, key=lambda x: x["score"], reverse=True)[:MAX_RESULTS]
 
     weights = compute_weights(signals)
 
-    # =========================
-    # CAPITAL DEPLOYMENT (FIXED)
-    # =========================
     capital = START_CAPITAL
     results = []
 
@@ -203,7 +182,6 @@ def run(return_results=False):
         entry = sig["entry"]
         stop = sig["stop"]
 
-        # risk-based sizing
         shares = calc_size(capital, entry, stop, BASE_RISK * w)
 
         if shares <= 0:
@@ -211,7 +189,6 @@ def run(return_results=False):
 
         cost = shares * entry
 
-        # 🔥 POSITION CAP (IMPORTANT)
         max_allowed = capital * MAX_POSITION_PCT
 
         if cost > max_allowed:
@@ -234,9 +211,6 @@ def run(return_results=False):
             "weight": round(w, 2)
         })
 
-    # =========================
-    # SAVE
-    # =========================
     write_results(results)
 
     print(f"✅ Scan complete — {len(results)} trades saved")
