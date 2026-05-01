@@ -4,7 +4,6 @@ import os
 
 EMAIL = os.getenv("EMAIL_ADD")
 PASSWORD = os.getenv("EMAIL_PASS")
-::quit
 
 def send_email(subject, body):
     msg = MIMEText(body)
