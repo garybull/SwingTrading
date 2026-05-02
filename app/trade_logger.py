@@ -172,30 +172,48 @@ def log_trade_exit(symbol, exit_price, exit_reason="MANUAL"):
 # GET OPEN POSITIONS
 # =========================
 def get_open_positions():
-    conn = get_connection()
+    conn = sqlite3.connect("trading_system.db")
     c = conn.cursor()
 
-    c.execute("""
-        SELECT symbol, entry_price, stop_price, target_price,
-               position_size, entry_date
-        FROM positions
-    """)
+    # Detect schema dynamically
+    c.execute("PRAGMA table_info(trades)")
+    columns = [col[1] for col in c.fetchall()]
 
+    entry_col = "entry_price" if "entry_price" in columns else "entry"
+    stop_col = "stop_price" if "stop_price" in columns else "stop"
+
+    shares_col = "shares" if "shares" in columns else None
+    status_col = "status" if "status" in columns else None
+
+    query = f"SELECT symbol, {entry_col}, {stop_col}"
+
+    if shares_col:
+        query += f", {shares_col}"
+    else:
+        query += ", 1"
+
+    query += " FROM trades"
+
+    if status_col:
+        query += " WHERE status = 'OPEN'"
+
+    c.execute(query)
     rows = c.fetchall()
     conn.close()
 
-    return [
-        {
-            "symbol": r[0],
-            "entry": r[1],
-            "stop": r[2],
-            "target": r[3],
-            "shares": r[4],
-            "entry_date": r[5]
-        }
-        for r in rows
-    ]
+    positions = []
 
+    for row in rows:
+        symbol, entry, stop, shares = row
+
+        positions.append({
+            "symbol": symbol,
+            "entry": float(entry),
+            "stop": float(stop),
+            "shares": float(shares)
+        })
+
+    return positions
 
 # =========================
 # GET TRADE HISTORY
