@@ -219,28 +219,71 @@ def get_open_positions():
 # GET TRADE HISTORY
 # =========================
 def get_trade_history():
-    conn = get_connection()
+    conn = sqlite3.connect("trading_system.db")
     c = conn.cursor()
 
-    c.execute("""
-        SELECT symbol, entry_price, exit_price, pnl, r_multiple,
-               entry_date, exit_date
-        FROM trades
-        ORDER BY entry_date DESC
-    """)
+    # Get actual columns
+    c.execute("PRAGMA table_info(trades)")
+    columns = [col[1] for col in c.fetchall()]
 
+    def col(*names):
+        for n in names:
+            if n in columns:
+                return n
+        return None
+
+    entry_col = col("entry", "entry_price")
+    stop_col = col("stop", "stop_price")
+    exit_col = col("exit", "exit_price")
+    shares_col = col("shares")
+
+    if not entry_col or not stop_col:
+        print("❌ Missing required columns")
+        return []
+
+    query = f"SELECT symbol, {entry_col}, {stop_col}"
+
+    if exit_col:
+        query += f", {exit_col}"
+    else:
+        query += ", NULL"
+
+    if shares_col:
+        query += f", {shares_col}"
+    else:
+        query += ", 1"
+
+    query += " FROM trades"
+
+    if "status" in columns:
+        query += " WHERE status = 'CLOSED'"
+
+    c.execute(query)
     rows = c.fetchall()
     conn.close()
 
-    return [
-        {
-            "symbol": r[0],
-            "entry": r[1],
-            "exit": r[2],
-            "pnl": r[3],
-            "r": r[4],
-            "entry_date": r[5],
-            "exit_date": r[6]
-        }
-        for r in rows
-    ]
+    history = []
+
+    for row in rows:
+        symbol, entry, stop, exit_price, shares = row
+
+        entry = float(entry)
+        stop = float(stop)
+        shares = float(shares)
+
+        if exit_price is not None:
+            exit_price = float(exit_price)
+            pnl = (exit_price - entry) * shares
+        else:
+            pnl = 0
+
+        history.append({
+            "symbol": symbol,
+            "entry": entry,
+            "exit": exit_price,
+            "stop": stop,
+            "shares": shares,
+            "pnl": pnl
+        })
+
+    return history
