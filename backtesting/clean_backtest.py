@@ -1,55 +1,47 @@
 # =========================
-# SAFE WARNING SUPPRESSION
-# =========================
-import os
-os.environ["PYTHONWARNINGS"] = "ignore"
-
-import warnings
-warnings.filterwarnings("ignore")
-
-# =========================
 # IMPORTS
 # =========================
 import pandas as pd
 import numpy as np
 import pickle
-from concurrent.futures import ProcessPoolExecutor
-import multiprocessing
 
 from app.strategy import generate_signal
+
 
 # =========================
 # CONFIG
 # =========================
 START_CAPITAL = 90000
 
-MAX_POSITIONS = 12
-MAX_NEW_TRADES = 6
+MAX_POSITIONS = 8
+MAX_NEW = 3   # ↑ increased from 2
 
-BASE_RISK = 0.015
-
-# 🔥 PYRAMID (LOCKED BEST)
-PYRAMID_ATR_TRIGGER = 1.25
-LOW_VOL_SCALE = 0.75
-MID_VOL_SCALE = 0.5
-HIGH_VOL_SCALE = 0.25
+BASE_RISK = 0.025
+EXPOSURE_MULT = 1.05   # 🔥 mild boost
 
 ENTRY_SLIPPAGE = 0.0005
 EXIT_SLIPPAGE = 0.0005
 
 CACHE_FILE = "backtest_cache.pkl"
 
-GLOBAL_DATA = None
+
+# =========================
+# LOAD DATA
+# =========================
+def load_data():
+    with open(CACHE_FILE, "rb") as f:
+        data = pickle.load(f)
+        print(f"Loaded data: {len(data)} symbols")
+        return data
 
 
 # =========================
-# PRECOMPUTE
+# INDICATORS
 # =========================
 def precompute_indicators(data):
     for df in data.values():
 
         df["ma50"] = df["Close"].rolling(50).mean()
-        df["ma20"] = df["Close"].rolling(20).mean()
 
         tr = pd.concat([
             df["High"] - df["Low"],
@@ -60,43 +52,6 @@ def precompute_indicators(data):
         df["atr"] = tr.rolling(14).mean()
 
     return data
-
-
-def load_data():
-    with open(CACHE_FILE, "rb") as f:
-        return pickle.load(f)
-
-
-def init_worker(data):
-    global GLOBAL_DATA
-    GLOBAL_DATA = data
-
-
-# =========================
-# SIGNAL (NO LOOKAHEAD)
-# =========================
-def process_symbol(args):
-    symbol, idx, spy = args
-    df = GLOBAL_DATA[symbol]
-
-    if idx < 50 or idx >= len(df) - 1:
-        return None
-
-    if df["Volume"].iloc[idx] < 1_000_000:
-        return None
-
-    if df["Close"].iloc[idx] < 20:
-        return None
-
-    hist = df.iloc[:idx]
-
-    signal = generate_signal(hist, symbol, spy)
-
-    if signal:
-        signal["index"] = idx
-        return signal
-
-    return None
 
 
 # =========================
@@ -113,46 +68,16 @@ def calc_size(capital, entry, stop, risk_pct):
 
 
 # =========================
-# SCORE WEIGHTING FUNCTION
-# =========================
-def compute_weights(signals):
-
-    scores = np.array([s["score"] for s in signals])
-
-    if len(scores) == 0:
-        return []
-
-    # normalize (z-score style)
-    mean = np.mean(scores)
-    std = np.std(scores) if np.std(scores) > 0 else 1
-
-    weights = []
-
-    for s in signals:
-        z = (s["score"] - mean) / std
-
-        # clamp weight range
-        weight = 1 + (z * 0.25)
-
-        weight = max(0.5, min(1.5, weight))
-
-        weights.append(weight)
-
-    return weights
-
-
-# =========================
-# BACKTEST ENGINE
+# BACKTEST
 # =========================
 def run_backtest():
 
-    print("🚀 RUNNING PRIORITIZED CAPITAL SYSTEM")
+    print("🚀 STARTING BACKTEST")
 
     data = load_data()
     data = precompute_indicators(data)
 
-    global GLOBAL_DATA
-    GLOBAL_DATA = data
+    spy_df = data["SPY"]
 
     all_dates = sorted(set().union(*[df.index for df in data.values()]))
 
@@ -161,194 +86,166 @@ def run_backtest():
     equity_curve = []
     trades = []
 
-    num_workers = max(4, multiprocessing.cpu_count() - 2)
+    for i in range(200, len(all_dates) - 1):
 
-    with ProcessPoolExecutor(
-        max_workers=num_workers,
-        initializer=init_worker,
-        initargs=(data,)
-    ) as executor:
+        date = all_dates[i]
+        next_date = all_dates[i + 1]
 
-        for i in range(51, len(all_dates) - 1):
+        still_open = []
 
-            date = all_dates[i]
-            next_date = all_dates[i + 1]
+        # =========================
+        # EXIT LOGIC
+        # =========================
+        for pos in positions:
 
-            still_open = []
+            df = data[pos["symbol"]]
 
-            # =========================
-            # UPDATE POSITIONS
-            # =========================
-            for pos in positions:
+            if date not in df.index:
+                still_open.append(pos)
+                continue
 
-                df = data[pos["symbol"]]
+            close = df.loc[date]["Close"]
 
-                if date not in df.index:
-                    still_open.append(pos)
-                    continue
+            pos["highest"] = max(pos["highest"], close)
 
-                row = df.loc[date]
-                exit_price = row["Close"] * (1 - EXIT_SLIPPAGE)
+            profit_atr = (pos["highest"] - pos["entry"]) / pos["atr"]
 
-                pos["highest"] = max(pos["highest"], row["Close"])
+            if profit_atr < 1:
+                new_stop = pos["stop"]
+            elif profit_atr < 2:
+                new_stop = pos["highest"] - 3 * pos["atr"]
+            elif profit_atr < 4:
+                new_stop = pos["highest"] - 2 * pos["atr"]
+            else:
+                new_stop = pos["highest"] - 2.5 * pos["atr"]
 
-                if row["Close"] >= pos["entry"] * 1.04:
-                    pos["stop"] = max(pos["stop"], pos["entry"])
+            pos["stop"] = max(pos["stop"], new_stop)
 
-                trail = pos["highest"] - (3.5 * pos["atr"])
-                pos["stop"] = max(pos["stop"], trail)
+            if close <= pos["stop"]:
+                exit_price = close * (1 - EXIT_SLIPPAGE)
+                pnl = (exit_price - pos["entry"]) * pos["shares"]
 
-                if row["Close"] <= pos["stop"]:
-                    proceeds = pos["shares"] * exit_price
-                    capital += proceeds
+                capital += pos["shares"] * exit_price
+                trades.append(pnl)
+            else:
+                still_open.append(pos)
 
-                    pnl = (exit_price - pos["entry"]) * pos["shares"]
-                    trades.append(pnl)
-                else:
-                    still_open.append(pos)
+        positions = still_open
 
-            positions = still_open
+        # =========================
+        # EQUITY
+        # =========================
+        equity = capital
+        for pos in positions:
+            df = data[pos["symbol"]]
+            if date in df.index:
+                equity += pos["shares"] * df.loc[date]["Close"]
 
-            # =========================
-            # EQUITY
-            # =========================
-            position_value = 0
-            for pos in positions:
-                df = data[pos["symbol"]]
-                if date in df.index:
-                    position_value += pos["shares"] * df.loc[date]["Close"]
+        equity_curve.append(equity)
 
-            equity_curve.append(capital + position_value)
+        # =========================
+        # MARKET REGIME
+        # =========================
+        if date not in spy_df.index:
+            continue
 
-            # =========================
-            # PYRAMID SIGNAL
-            # =========================
-            pyramid_orders = []
+        spy_close = spy_df.loc[date]["Close"]
+        spy_ma50 = spy_df["Close"].rolling(50).mean().loc[date]
+        spy_ma200 = spy_df["Close"].rolling(200).mean().loc[date]
 
-            for pos in positions:
+        if pd.isna(spy_ma50) or pd.isna(spy_ma200):
+            continue
 
-                if pos["pyramided"]:
-                    continue
+        if spy_close > spy_ma50 > spy_ma200:
+            base_exposure = 1.6
+        elif spy_close > spy_ma50:
+            base_exposure = 1.1
+        else:
+            base_exposure = 0.4
 
-                df = data[pos["symbol"]]
+        exposure = base_exposure * EXPOSURE_MULT
 
-                if date not in df.index:
-                    continue
+        # =========================
+        # SIGNAL GENERATION
+        # =========================
+        signals = []
 
-                row = df.loc[date]
+        for symbol, df in data.items():
 
-                if row["Close"] <= df["ma20"].loc[date]:
-                    continue
+            if symbol == "SPY" or date not in df.index:
+                continue
 
-                if row["Close"] >= pos["entry"] + (PYRAMID_ATR_TRIGGER * pos["atr"]):
-                    pyramid_orders.append(pos)
+            idx = df.index.get_loc(date)
+            if idx < 200:
+                continue
 
-            # =========================
-            # SIGNAL GENERATION
-            # =========================
-            spy = data.get("SPY")
+            hist = df.iloc[:idx]
 
-            args = []
-            for symbol in data.keys():
+            sig = generate_signal(hist, symbol, spy_df)
+            if sig:
+                sig["index"] = idx
+                signals.append(sig)
 
-                df = data[symbol]
-                if date not in df.index:
-                    continue
+        signals.sort(key=lambda x: x["score"], reverse=True)
 
-                idx = df.index.get_loc(date)
-                args.append((symbol, idx, spy))
+        open_count = len(positions)
 
-            raw = executor.map(process_symbol, args, chunksize=20)
+        # =========================
+        # ENTRY LOGIC
+        # =========================
+        for sig in signals[:MAX_NEW]:
 
-            signals = [r for r in raw if r]
-            signals = sorted(signals, key=lambda x: x["score"], reverse=True)
+            if open_count >= MAX_POSITIONS:
+                break
 
-            weights = compute_weights(signals)
+            df = data[sig["symbol"]]
+            idx = sig["index"]
 
-            # =========================
-            # EXECUTE PYRAMIDS
-            # =========================
-            for pos in pyramid_orders:
+            if idx + 1 >= len(df):
+                continue
 
-                df = data[pos["symbol"]]
-                idx = df.index.get_loc(date)
+            next_row = df.iloc[idx + 1]
+            if next_row.name != next_date:
+                continue
 
-                if idx + 1 >= len(df):
-                    continue
+            entry = next_row["Open"] * (1 + ENTRY_SLIPPAGE)
+            stop = sig["stop"]
 
-                next_row = df.iloc[idx + 1]
+            # 🔥 KEEP VOL SCALING (CRITICAL)
+            atr_pct = sig["atr"] / entry
 
-                if next_row.name != next_date:
-                    continue
+            if atr_pct < 0.02:
+                vol = 1.2
+            elif atr_pct < 0.04:
+                vol = 1.0
+            else:
+                vol = 0.7
 
-                entry = next_row["Open"] * (1 + ENTRY_SLIPPAGE)
+            risk = BASE_RISK * exposure * vol
 
-                atr_pct = pos["atr"] / pos["entry"]
+            shares = calc_size(capital, entry, stop, risk)
+            cost = shares * entry
 
-                if atr_pct < 0.02:
-                    scale = LOW_VOL_SCALE
-                elif atr_pct < 0.04:
-                    scale = MID_VOL_SCALE
-                else:
-                    scale = HIGH_VOL_SCALE
+            if shares <= 0 or cost > capital:
+                continue
 
-                add_shares = int(pos["initial_shares"] * scale)
-                cost = add_shares * entry
+            capital -= cost
 
-                if add_shares > 0 and cost <= capital:
-                    capital -= cost
-                    pos["shares"] += add_shares
-                    pos["pyramided"] = True
+            positions.append({
+                "symbol": sig["symbol"],
+                "entry": entry,
+                "stop": stop,
+                "shares": shares,
+                "highest": entry,
+                "atr": sig["atr"]
+            })
 
-            # =========================
-            # NEW ENTRIES (PRIORITIZED)
-            # =========================
-            for sig, weight in zip(signals[:MAX_NEW_TRADES], weights[:MAX_NEW_TRADES]):
-
-                if len(positions) >= MAX_POSITIONS:
-                    break
-
-                df = data[sig["symbol"]]
-                idx = sig["index"]
-
-                if idx + 1 >= len(df):
-                    continue
-
-                next_row = df.iloc[idx + 1]
-
-                if next_row.name != next_date:
-                    continue
-
-                entry = next_row["Open"] * (1 + ENTRY_SLIPPAGE)
-                stop = sig["stop"]
-
-                adjusted_risk = BASE_RISK * weight
-
-                shares = calc_size(capital, entry, stop, adjusted_risk)
-                cost = shares * entry
-
-                if shares <= 0 or cost > capital:
-                    continue
-
-                capital -= cost
-
-                positions.append({
-                    "symbol": sig["symbol"],
-                    "entry": entry,
-                    "stop": stop,
-                    "shares": shares,
-                    "initial_shares": shares,
-                    "entry_date": next_row.name,
-                    "highest": entry,
-                    "atr": sig.get("atr", 0),
-                    "pyramided": False
-                })
+            open_count += 1
 
     # =========================
     # RESULTS
     # =========================
     final = equity_curve[-1]
-
     years = len(equity_curve) / 252
     cagr = ((final / START_CAPITAL) ** (1 / years) - 1) * 100
 
@@ -363,7 +260,7 @@ def run_backtest():
         dd = (peak - x) / peak
         max_dd = max(max_dd, dd)
 
-    print("\n===== PRIORITIZED SYSTEM RESULTS =====")
+    print("\n===== BACKTEST RESULTS =====")
     print(f"Final Equity: {round(final, 2)}")
     print(f"CAGR: {round(cagr, 2)}%")
     print(f"Trades: {len(trades)}")
