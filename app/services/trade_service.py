@@ -4,15 +4,12 @@ from datetime import datetime
 DB_PATH = "trading_system.db"
 
 
-# =========================
-# CONNECTION
-# =========================
 def get_conn():
     return sqlite3.connect(DB_PATH)
 
 
 # =========================
-# CHECK POSITION EXISTS
+# CHECK IF OPEN POSITION EXISTS
 # =========================
 def open_position_exists(symbol):
     conn = get_conn()
@@ -29,7 +26,7 @@ def open_position_exists(symbol):
 
 
 # =========================
-# OPEN POSITION (MANUAL ENTRY)
+# OPEN POSITION
 # =========================
 def open_position(symbol, entry_price, stop_price, shares):
 
@@ -43,7 +40,7 @@ def open_position(symbol, entry_price, stop_price, shares):
 
     now = datetime.utcnow().isoformat()
 
-    # Insert into positions (SOURCE OF TRUTH)
+    # Insert into positions
     c.execute("""
         INSERT INTO positions (
             symbol, entry_price, stop_price, shares, status, opened_at
@@ -57,7 +54,7 @@ def open_position(symbol, entry_price, stop_price, shares):
         now
     ))
 
-    # Insert into trades (HISTORY)
+    # Insert into trades (open record)
     c.execute("""
         INSERT INTO trades (
             symbol, entry_price, shares, opened_at
@@ -70,6 +67,13 @@ def open_position(symbol, entry_price, stop_price, shares):
         now
     ))
 
+    # 🔥 MARK SIGNAL AS EXECUTED
+    c.execute("""
+        UPDATE signals
+        SET status = 'EXECUTED'
+        WHERE symbol = ? AND status = 'PENDING'
+    """, (symbol,))
+
     conn.commit()
     conn.close()
 
@@ -79,16 +83,15 @@ def open_position(symbol, entry_price, stop_price, shares):
 # =========================
 # CLOSE POSITION
 # =========================
-def close_position(symbol, exit_price, reason="MANUAL"):
+def close_position(symbol, exit_price):
 
     symbol = symbol.upper()
 
     conn = get_conn()
     c = conn.cursor()
 
-    # Get open position
     c.execute("""
-        SELECT id, entry_price, shares
+        SELECT id, entry_price, shares, stop_price
         FROM positions
         WHERE symbol = ? AND status = 'OPEN'
     """, (symbol,))
@@ -99,23 +102,23 @@ def close_position(symbol, exit_price, reason="MANUAL"):
         conn.close()
         return {"status": "error", "message": f"No open position for {symbol}"}
 
-    pos_id, entry_price, shares = row
+    pos_id, entry_price, shares, stop_price = row
 
     now = datetime.utcnow().isoformat()
 
     pnl = (float(exit_price) - entry_price) * shares
 
-    risk_per_share = entry_price - get_stop(symbol)
+    risk_per_share = entry_price - stop_price
     r_multiple = (float(exit_price) - entry_price) / risk_per_share if risk_per_share > 0 else 0
 
-    # Close position (DO NOT DELETE)
+    # Close position
     c.execute("""
         UPDATE positions
         SET status = 'CLOSED', closed_at = ?
         WHERE id = ?
     """, (now, pos_id))
 
-    # Update trade record
+    # Update trade
     c.execute("""
         UPDATE trades
         SET exit_price = ?, pnl = ?, r_multiple = ?, closed_at = ?
@@ -128,6 +131,13 @@ def close_position(symbol, exit_price, reason="MANUAL"):
         symbol
     ))
 
+    # 🔥 MARK SIGNAL AS CLOSED
+    c.execute("""
+        UPDATE signals
+        SET status = 'CLOSED'
+        WHERE symbol = ?
+    """, (symbol,))
+
     conn.commit()
     conn.close()
 
@@ -137,24 +147,6 @@ def close_position(symbol, exit_price, reason="MANUAL"):
         "pnl": round(pnl, 2),
         "r_multiple": round(r_multiple, 2)
     }
-
-
-# =========================
-# GET STOP (helper)
-# =========================
-def get_stop(symbol):
-    conn = get_conn()
-    c = conn.cursor()
-
-    c.execute("""
-        SELECT stop_price FROM positions
-        WHERE symbol = ? AND status = 'OPEN'
-    """, (symbol,))
-
-    row = c.fetchone()
-    conn.close()
-
-    return float(row[0]) if row else 0
 
 
 # =========================

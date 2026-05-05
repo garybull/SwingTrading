@@ -22,15 +22,16 @@ SCAN_STATUS = {
 
 
 # =========================
-# DB HELPERS
+# DB: GET SIGNALS
 # =========================
 def get_scan_results():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     c.execute("""
-        SELECT symbol, score, entry_price, stop_price, target_price, strong, shares, weight
-        FROM scan_results
+        SELECT symbol, score, entry, stop, target, shares, weight
+        FROM signals
+        WHERE status = 'PENDING'
         ORDER BY score DESC
     """)
 
@@ -44,9 +45,8 @@ def get_scan_results():
             "entry": float(r[2]),
             "stop": float(r[3]),
             "target": float(r[4]),
-            "strong": bool(r[5]),
-            "shares": int(r[6]) if r[6] else 0,
-            "weight": float(r[7]) if r[7] else 1.0
+            "shares": int(r[5]) if r[5] else 0,
+            "weight": float(r[6]) if r[6] else 1.0
         }
         for r in rows
     ]
@@ -61,7 +61,7 @@ def dashboard():
     return render_template(
         "dashboard.html",
         top5=results[:5],
-        strong=[r for r in results if r["strong"]]
+        strong=results  # optional, used in template
     )
 
 
@@ -111,7 +111,7 @@ def positions():
 
     symbols = [p["symbol"] for p in data]
 
-    # fetch latest prices
+    # Fetch latest prices
     df = yf.download(
         symbols,
         period="1d",
@@ -134,7 +134,7 @@ def positions():
             else:
                 price = float(df[symbol]["Close"].iloc[-1])
         except:
-            price = entry  # fallback
+            price = entry  # fallback if API fails
 
         pnl = (price - entry) * shares
         pnl_pct = ((price - entry) / entry) * 100
@@ -195,5 +195,8 @@ def chart_data(symbol):
     ])
 
 
+# =========================
+# RUN APP
+# =========================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

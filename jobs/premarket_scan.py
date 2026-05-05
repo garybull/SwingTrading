@@ -65,27 +65,27 @@ def write_results(results):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    c.execute("DELETE FROM scan_results")
+    # Clear old pending signals
+    c.execute("DELETE FROM signals WHERE status = 'PENDING'")
 
     for r in results:
         c.execute("""
-            INSERT INTO scan_results
-            (symbol, score, entry_price, stop_price, target_price, strong, shares, weight)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO signals (
+                symbol, score, entry, stop, target, shares, weight, status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
         """, (
             r["symbol"],
             r["score"],
             r["entry"],
             r["stop"],
             r["target"],
-            r["strong"],
             r["shares"],
             r["weight"]
         ))
 
     conn.commit()
     conn.close()
-
 
 # =========================
 # LOAD DATA (FIXED)
