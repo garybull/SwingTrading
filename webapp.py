@@ -4,9 +4,9 @@ import yfinance as yf
 import threading
 import time
 
-from app.trade_logger import (
-    log_trade_entry,
-    log_trade_exit,
+from app.services.trade_service import (
+    open_position,
+    close_position,
     get_open_positions,
     get_trade_history
 )
@@ -156,11 +156,10 @@ def history():
 
 @app.route("/add_trade", methods=["POST"])
 def add_trade():
-    log_trade_entry(
+    open_position(
         request.form["symbol"],
         float(request.form["entry"]),
         float(request.form["stop"]),
-        float(request.form["target"]),
         int(request.form["shares"])
     )
     return redirect("/positions")
@@ -168,10 +167,9 @@ def add_trade():
 
 @app.route("/close_trade", methods=["POST"])
 def close_trade():
-    log_trade_exit(
+    close_position(
         request.form["symbol"],
-        float(request.form["exit_price"]),
-        request.form.get("reason", "MANUAL")
+        float(request.form["exit_price"])
     )
     return redirect("/positions")
 
