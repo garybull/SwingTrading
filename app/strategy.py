@@ -7,99 +7,121 @@ def safe_scalar(x):
     return float(x)
 
 
-def generate_signal(df, symbol, spy_df=None):
+def generate_signal(df, symbol, spy_df=None, debug=False):
 
-    # =========================
-    # VALIDATION
-    # =========================
     if df is None or len(df) < 200:
+        if debug: print(f"{symbol}: FAIL - not enough data")
         return None
 
     if spy_df is None or len(spy_df) < 200:
+        if debug: print(f"{symbol}: FAIL - no SPY")
         return None
 
     try:
-        price = safe_scalar(df["Close"].iloc[-1])
-        ma50 = safe_scalar(df["ma50"].iloc[-1])
-        ma200 = safe_scalar(df["Close"].rolling(200).mean().iloc[-1])
-        atr = safe_scalar(df["atr"].iloc[-1])
+        price = float(df["Close"].iloc[-1])
+        ma50 = float(df["ma50"].iloc[-1])
+        ma200 = float(df["Close"].rolling(200).mean().iloc[-1])
+        atr = float(df["atr"].iloc[-1])
     except:
+        if debug: print(f"{symbol}: FAIL - indicator error")
         return None
 
-    if not all(map(pd.notna, [price, ma50, ma200, atr])):
+    if not all(pd.notna([price, ma50, ma200, atr])):
+        if debug: print(f"{symbol}: FAIL - NaN values")
         return None
+
+    reasons = []
+    setup = "Trend Continuation"
 
     # =========================
-    # TREND FILTER (STRONG)
+    # TREND FILTER
     # =========================
     if not (price > ma50 > ma200):
+        if debug: print(f"{symbol}: FAIL - trend")
         return None
+    else:
+        reasons.append("Strong uptrend (Price > 50MA > 200MA)")
 
     # =========================
-    # RELATIVE STRENGTH vs SPY
+    # ALIGN SPY
     # =========================
-    spy_close = spy_df["Close"]
+    spy_close = spy_df["Close"].reindex(df.index).ffill()
 
-    if len(spy_close) < len(df):
-        spy_close = spy_close.reindex(df.index).ffill()
-
-    # 20-day RS
-    rs_20 = (price / df["Close"].iloc[-20]) / (
-        spy_close.iloc[-1] / spy_close.iloc[-20]
-    )
-
-    # 60-day RS
-    rs_60 = (price / df["Close"].iloc[-60]) / (
-        spy_close.iloc[-1] / spy_close.iloc[-60]
-    )
+    try:
+        rs_20 = (price / df["Close"].iloc[-20]) / (
+            spy_close.iloc[-1] / spy_close.iloc[-20]
+        )
+        rs_60 = (price / df["Close"].iloc[-60]) / (
+            spy_close.iloc[-1] / spy_close.iloc[-60]
+        )
+    except:
+        if debug: print(f"{symbol}: FAIL - RS calc error")
+        return None
 
     if pd.isna(rs_20) or pd.isna(rs_60):
+        if debug: print(f"{symbol}: FAIL - RS NaN")
         return None
 
-    # Require outperformance
     if rs_20 < 1.05 or rs_60 < 1.10:
+        if debug: print(f"{symbol}: FAIL - RS too low ({rs_20:.2f}, {rs_60:.2f})")
         return None
+    else:
+        reasons.append(f"Relative strength strong (20d: {rs_20:.2f}, 60d: {rs_60:.2f})")
 
     # =========================
-    # MOMENTUM QUALITY
+    # EXTENSION FILTER
     # =========================
-    # Avoid parabolic moves
     extension = price / ma50
-
     if extension > 1.20:
+        if debug: print(f"{symbol}: FAIL - too extended")
         return None
-
-    # Avoid weak drift
-    momentum = price / df["Close"].iloc[-20]
-
-    if momentum < 1.05:
-        return None
+    else:
+        reasons.append(f"Not overextended ({extension:.2f} vs 50MA)")
 
     # =========================
-    # STRUCTURE (NOT FALLING APART)
+    # MOMENTUM
+    # =========================
+    momentum = price / df["Close"].iloc[-20]
+    if momentum < 1.05:
+        if debug: print(f"{symbol}: FAIL - weak momentum")
+        return None
+    else:
+        reasons.append(f"Momentum confirmed (+{(momentum - 1)*100:.1f}% / 20d)")
+
+    # =========================
+    # STRUCTURE
     # =========================
     recent_low = df["Low"].rolling(10).min().iloc[-1]
-
     if price < recent_low * 1.03:
+        if debug: print(f"{symbol}: FAIL - weak structure")
         return None
+    else:
+        reasons.append("Strong price structure (holding above recent lows)")
 
     # =========================
-    # SCORE (KEY)
+    # SCORE
     # =========================
     score = (rs_20 * 0.4) + (rs_60 * 0.4) + (momentum * 0.2)
 
     # =========================
-    # TRADE LEVELS
+    # RISK MODEL
     # =========================
-    entry = float(price)
-    stop = float(entry - (2.5 * atr))
+    entry = price
+    stop = entry - (2.5 * atr)
+
+    reasons.append(f"ATR-based stop ({round(2.5 * atr, 2)} risk per share)")
+
+    if debug:
+        print(f"{symbol}: ✅ PASS | Score: {round(score,2)}")
 
     return {
         "symbol": symbol,
         "entry": entry,
         "stop": stop,
-        "atr": float(atr),
-        "score": float(score),
-        "rs_20": float(rs_20),
-        "rs_60": float(rs_60)
+        "atr": atr,
+        "score": score,
+        "rs_20": rs_20,
+        "rs_60": rs_60,
+        "reasons": reasons,   # 🔥 NEW
+        "setup": setup        # 🔥 NEW
     }

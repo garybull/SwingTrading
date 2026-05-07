@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container">
+
+    <h2>🧠 Setup Performance</h2>
+
+    <div class="card">
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>Setup</th>
+                    <th>Trades</th>
+                    <th>Win Rate</th>
+                    <th>Avg R</th>
+                    <th>Total PnL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in data %}
+                <tr>
+                    <td>{{ s.setup }}</td>
+                    <td>{{ s.trades }}</td>
+                    <td>{{ s.win_rate }}%</td>
+                    <td>{{ s.avg_r }}</td>
+                    <td>${{ s.total_pnl }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+{% endblock %}

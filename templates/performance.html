@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container">
+
+    <h2 class="section-title">📈 Performance Dashboard</h2>
+
+    <!-- METRICS -->
+    <div class="card">
+
+        <div style="display:flex; gap:40px; flex-wrap:wrap;">
+
+            <div>
+                <h4>Total Trades</h4>
+                <p>{{ stats.total_trades }}</p>
+            </div>
+
+            <div>
+                <h4>Win Rate</h4>
+                <p>{{ stats.win_rate }}%</p>
+            </div>
+
+            <div>
+                <h4>Avg R</h4>
+                <p>{{ stats.avg_r }}R</p>
+            </div>
+
+            <div>
+                <h4>Expectancy</h4>
+                <p>{{ stats.expectancy }}R</p>
+            </div>
+
+            <div>
+                <h4>Profit Factor</h4>
+                <p>{{ stats.profit_factor }}</p>
+            </div>
+
+            <div>
+                <h4>Max Drawdown</h4>
+                <p style="color:#ef4444;">
+                    ${{ stats.max_drawdown }}
+                </p>
+            </div>
+
+            <div>
+                <h4>Total PnL</h4>
+                <p style="color:
+                    {% if stats.total_pnl > 0 %}#22c55e
+                    {% elif stats.total_pnl < 0 %}#ef4444
+                    {% else %}#e2e8f0{% endif %}
+                ">
+                    ${{ stats.total_pnl }}
+                </p>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- EQUITY CURVE -->
+    <div class="card">
+        <h3>Equity Curve</h3>
+        <div id="equityChart" style="height:400px;"></div>
+    </div>
+
+</div>
+
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
+<script>
+    const equityData = {{ stats.equity_curve | tojson }};
+
+    if (equityData.length > 0) {
+
+        const container = document.getElementById("equityChart");
+
+        const chart = LightweightCharts.createChart(container, {
+            width: container.clientWidth || 800,
+            height: 400,
+            layout: {
+                background: { color: '#0b1220' },
+                textColor: '#e2e8f0'
+            },
+            grid: {
+                vertLines: { color: '#1e293b' },
+                horzLines: { color: '#1e293b' }
+            }
+        });
+
+        const lineSeries = chart.addSeries(
+            LightweightCharts.LineSeries,
+            {
+                color: '#22c55e',
+                lineWidth: 2
+            }
+        );
+
+        const data = equityData.map((v, i) => ({
+            time: i,
+            value: v
+        }));
+
+        lineSeries.setData(data);
+
+        chart.timeScale().fitContent();
+
+        // resize fix
+        window.addEventListener("resize", () => {
+            chart.applyOptions({ width: container.clientWidth });
+        });
+    }
+</script>
+
+{% endblock %}

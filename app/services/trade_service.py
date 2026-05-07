@@ -28,7 +28,39 @@ def open_position_exists(symbol):
 # =========================
 # OPEN POSITION
 # =========================
-def open_position(symbol, entry_price, stop_price, shares):
+def open_position(symbol, entry_price, stop_price, shares, setup=None):
+
+    symbol = symbol.upper()
+
+    # 🔥 GUARDRAILS
+    if open_position_exists(symbol):
+        return {"status": "error", "message": f"{symbol} already open"}
+
+    if len(get_open_positions()) >= 6:
+        return {"status": "error", "message": "Max positions reached"}
+
+    conn = get_conn()
+    c = conn.cursor()
+
+    now = datetime.utcnow().isoformat()
+
+    c.execute("""
+    INSERT INTO trades (
+        symbol, entry_price, shares, opened_at, setup
+    )
+    VALUES (?, ?, ?, ?, ?)
+""", (
+    symbol,
+    float(entry_price),
+    int(shares),
+    now,
+    setup
+))
+
+    conn.commit()
+    conn.close()
+
+    return {"status": "success", "symbol": symbol}
 
     symbol = symbol.upper()
 
@@ -83,7 +115,162 @@ def open_position(symbol, entry_price, stop_price, shares):
 # =========================
 # CLOSE POSITION
 # =========================
-def close_position(symbol, exit_price):
+def close_position(symbol, exit_price, shares_to_close, grade=None, notes=None):
+
+    symbol = symbol.upper()
+
+    conn = get_conn()
+    c = conn.cursor()
+
+    c.execute("""
+        SELECT id, entry_price, shares, stop_price
+        FROM positions
+        WHERE symbol = ? AND status = 'OPEN'
+    """, (symbol,))
+
+    row = c.fetchone()
+
+    if not row:
+        conn.close()
+        return {"status": "error", "message": f"No open position for {symbol}"}
+
+    pos_id, entry_price, shares, stop_price = row
+
+    shares_to_close = int(shares_to_close)
+
+    if shares_to_close > shares:
+        conn.close()
+        return {"status": "error", "message": "Cannot close more shares than owned"}
+
+    now = datetime.utcnow().isoformat()
+
+    pnl = (float(exit_price) - entry_price) * shares_to_close
+
+    risk_per_share = entry_price - stop_price
+    r_multiple = (
+        (float(exit_price) - entry_price) / risk_per_share
+        if risk_per_share > 0 else 0
+    )
+
+    # FULL vs PARTIAL
+    if shares_to_close == shares:
+        c.execute("""
+            UPDATE positions
+            SET status = 'CLOSED', closed_at = ?
+            WHERE id = ?
+        """, (now, pos_id))
+    else:
+        remaining = shares - shares_to_close
+        c.execute("""
+            UPDATE positions
+            SET shares = ?
+            WHERE id = ?
+        """, (remaining, pos_id))
+
+    # 🔥 LOG TRADE WITH GRADE + NOTES
+    c.execute("""
+        INSERT INTO trades (
+            symbol, entry_price, exit_price, shares,
+            pnl, r_multiple, grade, notes,
+            opened_at, closed_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        symbol,
+        entry_price,
+        float(exit_price),
+        shares_to_close,
+        pnl,
+        r_multiple,
+        grade,
+        notes,
+        now,
+        now
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "status": "success",
+        "r": round(r_multiple, 2),
+        "pnl": round(pnl, 2)
+    }
+    symbol = symbol.upper()
+
+    conn = get_conn()
+    c = conn.cursor()
+
+    c.execute("""
+        SELECT id, entry_price, shares, stop_price
+        FROM positions
+        WHERE symbol = ? AND status = 'OPEN'
+    """, (symbol,))
+
+    row = c.fetchone()
+
+    if not row:
+        conn.close()
+        return {"status": "error", "message": f"No open position for {symbol}"}
+
+    pos_id, entry_price, shares, stop_price = row
+
+    shares_to_close = int(shares_to_close)
+
+    if shares_to_close > shares:
+        conn.close()
+        return {"status": "error", "message": "Cannot close more shares than owned"}
+
+    now = datetime.utcnow().isoformat()
+
+    pnl = (float(exit_price) - entry_price) * shares_to_close
+
+    risk_per_share = entry_price - stop_price
+    r_multiple = (float(exit_price) - entry_price) / risk_per_share if risk_per_share > 0 else 0
+
+    # 🔥 UPDATE POSITION
+    if shares_to_close == shares:
+        # FULL CLOSE
+        c.execute("""
+            UPDATE positions
+            SET status = 'CLOSED', closed_at = ?
+            WHERE id = ?
+        """, (now, pos_id))
+    else:
+        # PARTIAL CLOSE
+        remaining = shares - shares_to_close
+        c.execute("""
+            UPDATE positions
+            SET shares = ?
+            WHERE id = ?
+        """, (remaining, pos_id))
+
+    # LOG TRADE
+    c.execute("""
+        INSERT INTO trades (
+            symbol, entry_price, exit_price, shares, pnl, r_multiple, opened_at, closed_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        symbol,
+        entry_price,
+        float(exit_price),
+        shares_to_close,
+        pnl,
+        r_multiple,
+        now,
+        now
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "status": "success",
+        "symbol": symbol,
+        "closed_shares": shares_to_close,
+        "remaining": shares - shares_to_close
+    }
 
     symbol = symbol.upper()
 
@@ -152,6 +339,8 @@ def close_position(symbol, exit_price):
 # =========================
 # GET OPEN POSITIONS
 # =========================
+import yfinance as yf
+
 def get_open_positions():
 
     conn = get_conn()
@@ -166,16 +355,30 @@ def get_open_positions():
     rows = c.fetchall()
     conn.close()
 
-    return [
-        {
-            "symbol": r[0],
-            "entry": float(r[1]),
-            "stop": float(r[2]),
-            "shares": int(r[3])
-        }
-        for r in rows
-    ]
+    positions = []
 
+    for r in rows:
+        symbol, entry, stop, shares = r
+
+        try:
+            price = yf.Ticker(symbol).history(period="1d")["Close"].iloc[-1]
+        except:
+            price = entry  # fallback
+
+        pnl = (price - entry) * shares
+        pnl_pct = (price - entry) / entry * 100 if entry else 0
+
+        positions.append({
+            "symbol": symbol,
+            "entry": float(entry),
+            "stop": float(stop),
+            "shares": int(shares),
+            "price": float(price),
+            "pnl": float(pnl),
+            "pnl_pct": float(pnl_pct)
+        })
+
+    return positions
 
 # =========================
 # GET TRADE HISTORY

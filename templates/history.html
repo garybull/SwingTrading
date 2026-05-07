@@ -1,25 +1,58 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Trade History</h2>
 
-<table border="1">
-<tr>
-    <th>Symbol</th>
-    <th>Entry</th>
-    <th>Exit</th>
-    <th>PnL</th>
-    <th>R</th>
-</tr>
+<div class="container">
 
-{% for t in trades %}
-<tr>
-    <td>{{ t.symbol }}</td>
-    <td>{{ t.entry }}</td>
-    <td>{{ t.exit }}</td>
-    <td>{{ t.pnl }}</td>
-    <td>{{ t.r }}</td>
-</tr>
-{% endfor %}
-</table>
+    <h2 class="section-title">📜 Trade History</h2>
+
+    {% if trades and trades|length > 0 %}
+    <div class="card">
+
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Entry</th>
+                    <th>Exit</th>
+                    <th>Shares</th>
+                    <th>PnL</th>
+                    <th>R</th>
+                    <th>Grade</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for t in trades %}
+                <tr>
+                    <td>{{ t.symbol }}</td>
+                    <td>${{ "%.2f"|format(t.entry) }}</td>
+                    <td>${{ "%.2f"|format(t.exit) }}</td>
+                    <td>{{ t.shares }}</td>
+
+                    <td style="color:
+                        {% if t.pnl > 0 %}#22c55e
+                        {% elif t.pnl < 0 %}#ef4444
+                        {% else %}#e2e8f0{% endif %}
+                    ">
+                        {{ "%.2f"|format(t.pnl) }}
+                    </td>
+
+                    <td>{{ "%.2f"|format(t.r) }}R</td>
+                    <td>{{ t.grade if t.grade else "-" }}</td>
+                    <td>{{ t.notes if t.notes else "-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+
+    </div>
+    {% else %}
+    <p>No closed trades yet.</p>
+    {% endif %}
+
+</div>
+
 {% endblock %}
