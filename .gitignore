@@ -2,3 +2,9 @@ trading_system.db
 venv/
 *.db
 venv/
+*.pkl
+*.pem
+__pycache__/
+.env
+*.log
+.docx
