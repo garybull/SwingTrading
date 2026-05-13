@@ -247,9 +247,29 @@ def calculate_performance(equity_curve):
         equity_curve.iloc[0]["equity"]
     )
 
+    if starting_equity <= 0:
+
+        return {
+
+            "cagr": 0,
+
+            "max_drawdown": 0
+
+        }
+
     ending_equity = float(
         equity_curve.iloc[-1]["equity"]
     )
+
+    if ending_equity <= 0:
+
+        return {
+
+            "cagr": 0,
+
+            "max_drawdown": 0
+
+        }
 
     total_days = len(equity_curve)
 
