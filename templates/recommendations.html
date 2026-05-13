@@ -10,9 +10,9 @@
         Manual Scan
     </h2>
 
-    <form method="POST" action="/run_scan">
+    <form method="POST" action="/run_scan" onsubmit="showScanStatus()">
 
-        <button type="submit">
+        <button id="scanButton" type="submit">
 
             Run Rebalance Scan
 
@@ -20,7 +20,60 @@
 
     </form>
 
+    <div id="scanStatus" style="
+            display:none;
+            margin-top:20px;
+        ">
+
+        <div class="spinner"></div>
+
+        <p>
+
+            Running rebalance scan...
+
+        </p>
+
+        <p class="warning">
+
+            Pulling market data,
+            calculating momentum,
+            generating recommendations...
+
+        </p>
+
+    </div>
+
 </div>
+
+<script>
+
+    function showScanStatus() {
+
+        document.getElementById(
+
+            "scanStatus"
+
+        ).style.display = "block";
+
+        document.getElementById(
+
+            "scanButton"
+
+        ).disabled = true;
+
+        document.getElementById(
+
+            "scanButton"
+
+        ).innerHTML = (
+
+                "Running Scan..."
+
+            );
+
+    }
+
+</script>
 
 {% if warnings %}
 
