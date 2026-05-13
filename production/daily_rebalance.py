@@ -402,9 +402,17 @@ def main():
 
     conn = get_connection()
 
-    capital = get_current_equity(
-        conn
+    from app.live_portfolio import (
+        get_live_portfolio
     )
+
+    live_portfolio = (
+        get_live_portfolio()
+    )
+
+    capital = live_portfolio[
+        "total_equity"
+    ]
 
     logger.info(
         f"Current equity: ${capital:,.2f}"
@@ -645,7 +653,7 @@ def main():
 
         conn,
 
-        capital,
+        get_current_equity(conn),
 
         cash,
 

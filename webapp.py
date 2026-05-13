@@ -446,6 +446,43 @@ def trades():
 
     )
 
+# =====================================
+# RECONCILE
+# =====================================
+@app.route("/reconcile")
+def reconcile():
+
+    from app.reconciliation import (
+        rebuild_positions_from_trades
+    )
+
+    rebuild_positions_from_trades()
+
+    return redirect("/")
+
+
+# =====================================
+# TRADE ANALYTICS
+# =====================================
+@app.route("/trade-analytics")
+def trade_analytics():
+
+    from app.trade_analytics import (
+        get_trade_analytics
+    )
+
+    analytics = (
+        get_trade_analytics()
+    )
+
+    return render_template(
+
+        "trade_analytics.html",
+
+        analytics=analytics
+
+    )
+
 
 # =====================================
 # HISTORY PAGE

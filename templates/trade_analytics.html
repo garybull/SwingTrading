@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="grid">
+
+    <div class="card">
+
+        <h2>
+            Win Rate
+        </h2>
+
+        <div class="metric">
+
+            {{ analytics.win_rate }}%
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Profit Factor
+        </h2>
+
+        <div class="metric">
+
+            {{ analytics.profit_factor }}
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Expectancy
+        </h2>
+
+        <div class="metric">
+
+            ${{ "{:,.2f}".format(
+            analytics.expectancy
+            ) }}
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Avg Winner
+        </h2>
+
+        <div class="metric positive">
+
+            ${{ "{:,.2f}".format(
+            analytics.avg_win
+            ) }}
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Avg Loser
+        </h2>
+
+        <div class="metric negative">
+
+            ${{ "{:,.2f}".format(
+            analytics.avg_loss
+            ) }}
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Largest Winner
+        </h2>
+
+        <div class="metric positive">
+
+            ${{ "{:,.2f}".format(
+            analytics.largest_win
+            ) }}
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Largest Loser
+        </h2>
+
+        <div class="metric negative">
+
+            ${{ "{:,.2f}".format(
+            analytics.largest_loss
+            ) }}
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Symbol Attribution
+    </h2>
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Symbol</th>
+                <th>Total P/L</th>
+                <th>Trades</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for row in analytics.symbol_stats %}
+
+            <tr>
+
+                <td>
+                    {{ row.symbol }}
+                </td>
+
+                <td>
+
+                    {% if row.total_pnl >= 0 %}
+
+                    <span class="positive">
+
+                        {% else %}
+
+                        <span class="negative">
+
+                            {% endif %}
+
+                            ${{ "{:,.2f}".format(
+                            row.total_pnl
+                            ) }}
+
+                        </span>
+
+                </td>
+
+                <td>
+                    {{ row.trade_count }}
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

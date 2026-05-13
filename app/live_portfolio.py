@@ -2,9 +2,12 @@
 
 import sqlite3
 import pandas as pd
-import yfinance as yf
 
 from app.config import DB_NAME
+
+from app.price_cache import (
+    get_live_prices
+)
 
 from app.logger import logger
 
@@ -81,110 +84,15 @@ def get_live_portfolio():
     ].tolist()
 
     logger.info(
-        f"Pulling live prices for {tickers}"
+
+        f"Getting live prices for "
+        f"{tickers}"
+
     )
 
-    try:
-
-        data = yf.download(
-
-            tickers,
-
-            period="1d",
-
-            interval="1m",
-
-            progress=False,
-
-            auto_adjust=True
-
-        )
-
-    except Exception as e:
-
-        logger.error(
-
-            f"Live pricing failed: {e}"
-
-        )
-
-        return {
-
-            "positions": positions,
-
-            "equity": 0,
-
-            "cash": 0,
-
-            "total_equity": 0
-
-        }
-
-    # =====================================
-    # EXTRACT LIVE PRICES
-    # =====================================
-    live_prices = {}
-
-    try:
-
-        # MULTI-TICKER FORMAT
-        if isinstance(
-
-            data.columns,
-
-            pd.MultiIndex
-
-        ):
-
-            for symbol in tickers:
-
-                try:
-
-                    price = float(
-
-                        data["Close"][
-                            symbol
-                        ].dropna().iloc[-1]
-
-                    )
-
-                    live_prices[
-                        symbol
-                    ] = price
-
-                except:
-
-                    logger.warning(
-
-                        f"No live price "
-                        f"for {symbol}"
-
-                    )
-
-        # SINGLE TICKER FORMAT
-        else:
-
-            symbol = tickers[0]
-
-            price = float(
-
-                data["Close"]
-                .dropna()
-                .iloc[-1]
-
-            )
-
-            live_prices[
-                symbol
-            ] = price
-
-    except Exception as e:
-
-        logger.error(
-
-            f"Price parsing failed: {e}"
-
-        )
+    live_prices = get_live_prices(
+        tickers
+    )
 
     # =====================================
     # UPDATE LIVE VALUES
@@ -197,19 +105,26 @@ def get_live_portfolio():
 
         symbol = row["symbol"]
 
-        shares = row["shares"]
+        shares = float(
+            row["shares"]
+        )
 
-        entry_price = row[
-            "entry_price"
-        ]
+        entry_price = float(
+            row["entry_price"]
+        )
 
+        # =====================================
+        # LIVE PRICE
+        # =====================================
         price = live_prices.get(
 
             symbol,
 
-            row.get(
-                "current_price",
-                0
+            float(
+                row.get(
+                    "current_price",
+                    0
+                )
             )
 
         )
@@ -219,8 +134,14 @@ def get_live_portfolio():
         )
 
         pnl = (
+
             market_value
-            - (shares * entry_price)
+
+            - (
+                shares
+                * entry_price
+            )
+
         )
 
         total_market_value += (
@@ -233,23 +154,30 @@ def get_live_portfolio():
 
             "shares": shares,
 
-            "entry_price": entry_price,
+            "entry_price":
+                entry_price,
 
-            "current_price": price,
+            "current_price":
+                price,
 
-            "market_value": market_value,
+            "market_value":
+                market_value,
 
             "pnl": pnl,
 
-            "momentum_score": row.get(
-                "momentum_score",
-                0
-            ),
+            "momentum_score":
 
-            "volatility": row.get(
-                "volatility",
-                0
-            )
+                row.get(
+                    "momentum_score",
+                    0
+                ),
+
+            "volatility":
+
+                row.get(
+                    "volatility",
+                    0
+                )
 
         })
 
@@ -273,8 +201,10 @@ def get_live_portfolio():
     )
 
     total_equity = (
+
         total_market_value
         + current_cash
+
     )
 
     # =====================================
@@ -303,18 +233,24 @@ def get_live_portfolio():
     logger.info(
 
         f"Live portfolio updated | "
-        f"Equity: ${total_equity:,.2f}"
+
+        f"Equity: "
+        f"${total_equity:,.2f}"
 
     )
 
     return {
 
-        "positions": positions_df,
+        "positions":
+            positions_df,
 
-        "equity": total_market_value,
+        "equity":
+            total_market_value,
 
-        "cash": current_cash,
+        "cash":
+            current_cash,
 
-        "total_equity": total_equity
+        "total_equity":
+            total_equity
 
     }
