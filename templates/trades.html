@@ -1,0 +1,90 @@
+<!-- templates/trades.html -->
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card">
+
+    <h2>
+        Manual Trade Entry
+    </h2>
+
+    <form method="POST" action="/log_trade">
+
+        <div style="margin-bottom: 10px;">
+
+            <label>Symbol</label><br>
+
+            <select name="symbol" required>
+            
+                <option value="">
+                    Select Symbol
+                </option>
+            
+                <option value="TQQQ">TQQQ</option>
+                <option value="SOXL">SOXL</option>
+                <option value="TECL">TECL</option>
+                <option value="UPRO">UPRO</option>
+                <option value="USD">USD</option>
+                <option value="QQQ">QQQ</option>
+                <option value="SPY">SPY</option>
+                
+            
+            </select>
+
+        </div>
+
+        <div style="margin-bottom: 10px;">
+
+            <label>Side</label><br>
+
+            <select name="side">
+
+                <option value="BUY">
+                    BUY
+                </option>
+
+                <option value="SELL">
+                    SELL
+                </option>
+
+            </select>
+
+        </div>
+
+        <div style="margin-bottom: 10px;">
+
+            <label>Shares</label><br>
+
+            <input type="number" name="shares" required>
+
+        </div>
+
+        <div style="margin-bottom: 10px;">
+
+            <label>Fill Price</label><br>
+
+            <input type="number" step="0.01" name="fill_price" required>
+
+        </div>
+
+        <div style="margin-bottom: 10px;">
+
+            <label>Notes</label><br>
+
+            <input type="text" name="notes">
+
+        </div>
+
+        <button type="submit">
+
+            Log Trade
+
+        </button>
+
+    </form>
+
+</div>
+
+{% endblock %}

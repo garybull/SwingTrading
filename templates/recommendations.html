@@ -1,0 +1,178 @@
+<!-- templates/recommendations.html -->
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+
+    <h2>
+        Manual Scan
+    </h2>
+
+    <form method="POST" action="/run_scan">
+
+        <button type="submit">
+
+            Run Rebalance Scan
+
+        </button>
+
+    </form>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Recommended Portfolio
+    </h2>
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Symbol</th>
+                <th>Target Allocation</th>
+                <th>Score</th>
+                <th>Action</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for r in recommended_portfolio %}
+
+            <tr>
+
+                <td>{{ r.symbol }}</td>
+
+                <td>
+                    {{ "%.2f"|format(
+                    r.target_allocation * 100
+                    ) }}%
+                </td>
+
+                <td>
+                    {{ "%.2f"|format(
+                    r.score
+                    ) }}
+                </td>
+
+                <td>
+                    {{ r.action }}
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Current Positions
+    </h2>
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Symbol</th>
+                <th>Shares</th>
+                <th>Allocation</th>
+                <th>Market Value</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for p in positions %}
+
+            <tr>
+
+                <td>{{ p.symbol }}</td>
+
+                <td>{{ p.shares }}</td>
+
+                <td>
+                    {{ "%.2f"|format(
+                    p.allocation_pct * 100
+                    ) }}%
+                </td>
+
+                <td>
+                    ${{ "{:,.2f}".format(
+                    p.market_value
+                    ) }}
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Momentum Rankings
+    </h2>
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Rank</th>
+                <th>Symbol</th>
+                <th>Score</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for r in rankings %}
+
+            <tr>
+
+                <td>{{ r.rank }}</td>
+
+                <td>{{ r.symbol }}</td>
+
+                <td>
+                    {{ "%.2f"|format(
+                    r.score
+                    ) }}
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

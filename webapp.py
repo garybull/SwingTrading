@@ -1,333 +1,593 @@
-from flask import Flask, render_template, request, redirect, jsonify
+# webapp.py
+
 import sqlite3
 import json
-import yfinance as yf
-import threading
+import plotly.graph_objs as go
+import plotly.utils
+from flask import (
 
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for
 
-from app.services.trade_service import (
-    open_position,
-    close_position,
-    get_open_positions,
-    get_trade_history
+)
+from production.daily_rebalance import (
+    main as run_rebalance
+)
+from app.portfolio import (
+    get_dashboard_data
 )
 
+from app.config import (
+
+    WEB_HOST,
+    WEB_PORT,
+    DB_NAME
+
+)
+
+from app.logger import logger
+
+
+# =====================================
+# APP
+# =====================================
 app = Flask(__name__)
 
-DB_PATH = "trading_system.db"
 
-SCAN_PROGRESS = {
-    "running": False,
-    "current": 0,
-    "total": 0,
-    "message": "Idle"
-}
+# =====================================
+# DB CONNECTION
+# =====================================
+def get_connection():
 
-# =========================
-# SCAN RESULTS
-# =========================
-import json
-
-import json
-
-def get_scan_results():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    c.execute("""
-        SELECT 
-            symbol,
-            score,
-            entry,
-            stop,
-            target,
-            shares,
-            weight,
-            setup,
-            reasons
-        FROM signals
-        WHERE status = 'PENDING'
-        ORDER BY score DESC
-    """)
-
-    rows = c.fetchall()
-    conn.close()
-
-    results = []
-    for r in rows:
-        results.append({
-            "symbol": r[0],
-            "score": float(r[1]),
-            "entry": float(r[2]),
-            "stop": float(r[3]),
-            "target": float(r[4]) if r[4] else None,
-            "shares": int(r[5]),
-            "weight": float(r[6]),
-            "setup": r[7] or "Unknown",
-            "reasons": json.loads(r[8]) if r[8] else []
-        })
-
-    return results
-
-# =========================
-# PERFORMANCE
-# =========================
-def get_performance_stats():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    c.execute("""
-        SELECT pnl, r_multiple
-        FROM trades
-        WHERE pnl IS NOT NULL
-    """)
-
-    rows = c.fetchall()
-    conn.close()
-
-    if not rows:
-        return {
-            "total_trades": 0,
-            "win_rate": 0,
-            "avg_r": 0,
-            "expectancy": 0,
-            "total_pnl": 0,
-            "profit_factor": 0,
-            "max_drawdown": 0,
-            "equity_curve": []
-        }
-
-    total = len(rows)
-
-    wins = [r for r in rows if r[0] > 0]
-    losses = [r for r in rows if r[0] <= 0]
-
-    win_rate = len(wins) / total if total else 0
-
-    avg_r = sum(r[1] for r in rows) / total
-
-    avg_win_r = sum(r[1] for r in wins) / len(wins) if wins else 0
-    avg_loss_r = sum(r[1] for r in losses) / len(losses) if losses else 0
-
-    expectancy = (win_rate * avg_win_r) + ((1 - win_rate) * avg_loss_r)
-
-    total_pnl = sum(r[0] for r in rows)
-
-    # PROFIT FACTOR
-    gross_win = sum(r[0] for r in wins)
-    gross_loss = abs(sum(r[0] for r in losses))
-    profit_factor = gross_win / gross_loss if gross_loss > 0 else 0
-
-    # EQUITY + DRAWDOWN
-    equity = []
-    running = 0
-    peak = 0
-    max_dd = 0
-
-    for pnl, _ in rows:
-        running += pnl
-        equity.append(running)
-
-        peak = max(peak, running)
-        dd = running - peak
-        max_dd = min(max_dd, dd)
-
-    return {
-        "total_trades": total,
-        "win_rate": round(win_rate * 100, 2),
-        "avg_r": round(avg_r, 2),
-        "expectancy": round(expectancy, 2),
-        "total_pnl": round(total_pnl, 2),
-        "profit_factor": round(profit_factor, 2),
-        "max_drawdown": round(max_dd, 2),
-        "equity_curve": equity
-    }
-
-# =========================
-# Setup Performance 
-# =========================
-def get_setup_performance():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    c.execute("""
-        SELECT setup, pnl, r_multiple
-        FROM trades
-        WHERE closed_at IS NOT NULL
-        AND setup IS NOT NULL
-    """)
-
-    rows = c.fetchall()
-    conn.close()
-
-    stats = {}
-
-    for setup, pnl, r in rows:
-
-        if setup not in stats:
-            stats[setup] = {
-                "trades": 0,
-                "wins": 0,
-                "total_pnl": 0,
-                "total_r": 0
-            }
-
-        stats[setup]["trades"] += 1
-        stats[setup]["total_pnl"] += pnl
-        stats[setup]["total_r"] += r
-
-        if pnl > 0:
-            stats[setup]["wins"] += 1
-
-    results = []
-
-    for setup, s in stats.items():
-        trades = s["trades"]
-
-        results.append({
-            "setup": setup,
-            "trades": trades,
-            "win_rate": round((s["wins"] / trades) * 100, 2),
-            "avg_r": round(s["total_r"] / trades, 2),
-            "total_pnl": round(s["total_pnl"], 2)
-        })
-
-    return sorted(results, key=lambda x: x["avg_r"], reverse=True)
-
-# =========================
-# Scanner
-# =========================
-
-def run_scan_background():
-    from jobs.premarket_scan import run, UNIVERSE
-
-    SCAN_PROGRESS["running"] = True
-    SCAN_PROGRESS["current"] = 0
-    SCAN_PROGRESS["total"] = len(UNIVERSE)
-    SCAN_PROGRESS["message"] = "Starting..."
-
-    def progress_callback(symbol, idx, total):
-        SCAN_PROGRESS["current"] = idx
-        SCAN_PROGRESS["total"] = total
-        SCAN_PROGRESS["message"] = f"Scanning {symbol} ({idx}/{total})"
-
-    run(progress_callback=progress_callback)
-
-    SCAN_PROGRESS["running"] = False
-    SCAN_PROGRESS["message"] = "✅ Scan complete"
+    return sqlite3.connect(DB_NAME)
 
 
-# =========================
-# ROUTES
-# =========================
+# =====================================
+# BUILD EQUITY CHART
+# =====================================
+def build_equity_chart(equity_curve):
+
+    equity_fig = go.Figure()
+
+    equity_fig.add_trace(
+
+        go.Scatter(
+
+            x=equity_curve["date"],
+
+            y=equity_curve["equity"],
+
+            mode="lines",
+
+            name="Equity"
+
+        )
+
+    )
+
+    equity_fig.update_layout(
+
+        title="Portfolio Equity Curve",
+
+        template="plotly_dark",
+
+        height=500
+
+    )
+
+    return json.dumps(
+
+        equity_fig,
+
+        cls=plotly.utils.PlotlyJSONEncoder
+
+    )
+
+
+# =====================================
+# MAIN DASHBOARD
+# =====================================
 @app.route("/")
 def dashboard():
-    results = get_scan_results()
-    return render_template("dashboard.html", top5=results[:5])
+
+    data = get_dashboard_data()
+
+    system_state = (
+        data["system_state"]
+    )
+
+    performance = (
+        data["performance"]
+    )
+
+    drawdown = (
+        data["drawdown"]
+    )
+
+    equity_curve = (
+        data["equity_curve"]
+    )
+
+    equity_chart = build_equity_chart(
+        equity_curve
+    )
+
+    pnl_summary = (
+        data["pnl_summary"]
+    )
+
+    return render_template(
+
+        "dashboard.html",
+
+        system_state=system_state,
+
+        performance=performance,
+
+        drawdown=drawdown,
+
+        equity_chart=equity_chart,
+
+        pnl_summary=pnl_summary
+
+    )
 
 
-@app.route("/trade_plan")
-def trade_plan():
-    results = get_scan_results()
-    return render_template("trade_plan.html", trades=results)
+# =====================================
+# RECOMMENDATIONS PAGE
+# =====================================
+@app.route("/recommendations")
+def recommendations():
+
+    data = get_dashboard_data()
+
+    return render_template(
+
+        "recommendations.html",
+
+        recommended_portfolio=(
+            data["recommended_portfolio"]
+            .to_dict(orient="records")
+        ),
+
+        positions=(
+            data["positions"]
+            .to_dict(orient="records")
+        ),
+
+        rankings=(
+            data["rankings"]
+            .to_dict(orient="records")
+        )
+
+    )
+
+# =====================================
+# PNL
+# =====================================
+
+@app.route("/pnl")
+def pnl():
+
+    data = get_dashboard_data()
+
+    pnl_summary = data[
+        "pnl_summary"
+    ]
+
+    return render_template(
+
+        "pnl.html",
+
+        unrealized_positions=(
+            pnl_summary[
+                "unrealized_positions"
+            ].to_dict(
+                orient="records"
+            )
+        ),
+
+        realized_trades=(
+            pnl_summary[
+                "realized_trades"
+            ].to_dict(
+                orient="records"
+            )
+        ),
+
+        total_unrealized=(
+            pnl_summary[
+                "total_unrealized"
+            ]
+        ),
+
+        total_realized=(
+            pnl_summary[
+                "total_realized"
+            ]
+        )
+
+    )
+# =====================================
+# RUN SCAN
+# =====================================
+@app.route(
+
+    "/run_scan",
+
+    methods=["POST"]
+
+)
+def run_scan():
+
+    logger.info(
+        "🚀 Manual scan triggered"
+    )
+
+    try:
+
+        run_rebalance()
+
+        logger.info(
+            "✅ Manual scan complete"
+        )
+
+    except Exception as e:
+
+        logger.error(
+
+            f"❌ Manual scan failed: {e}"
+
+        )
+
+    return redirect(
+        url_for("recommendations")
+    )
 
 
-@app.route("/run_scan")
-def run_scan_route():
-    if not SCAN_PROGRESS["running"]:
-        threading.Thread(target=run_scan_background).start()
+# =====================================
+# BENCHMARKS
+# =====================================
+@app.route("/benchmarks")
+def benchmarks():
 
-    return jsonify({"status": "started"})
+    from app.benchmark_engine import (
+        get_benchmark_report
+    )
 
-@app.route("/scan_status")
-def scan_status():
-    return jsonify(SCAN_PROGRESS)
+    benchmark_data = (
+        get_benchmark_report()
+    )
+
+    report = benchmark_data[
+        "report"
+    ]
+
+    system_curve = benchmark_data[
+        "system_curve"
+    ]
+
+    benchmark_curves = benchmark_data[
+        "benchmark_curves"
+    ]
+
+    # =====================================
+    # EQUITY CHART
+    # =====================================
+    equity_fig = go.Figure()
+
+    # SYSTEM
+    equity_fig.add_trace(
+
+        go.Scatter(
+
+            x=system_curve["date"],
+
+            y=system_curve[
+                "normalized"
+            ],
+
+            mode="lines",
+
+            name="SYSTEM"
+
+        )
+
+    )
+
+    # BENCHMARKS
+    for symbol, curve in benchmark_curves.items():
+
+        equity_fig.add_trace(
+
+            go.Scatter(
+
+                x=curve.index,
+
+                y=curve.values,
+
+                mode="lines",
+
+                name=symbol
+
+            )
+
+        )
+
+    equity_fig.update_layout(
+
+        title="Equity Curve Comparison",
+
+        template="plotly_dark",
+
+        height=600
+
+    )
+
+    equity_chart = json.dumps(
+
+        equity_fig,
+
+        cls=plotly.utils.PlotlyJSONEncoder
+
+    )
+
+    # =====================================
+    # DRAWDOWN CHART
+    # =====================================
+    dd_fig = go.Figure()
+
+    # SYSTEM DD
+    system_dd = (
+
+        system_curve["normalized"]
+
+        / system_curve["normalized"]
+        .cummax()
+
+        - 1
+
+    ) * 100
+
+    dd_fig.add_trace(
+
+        go.Scatter(
+
+            x=system_curve["date"],
+
+            y=system_dd,
+
+            mode="lines",
+
+            name="SYSTEM"
+
+        )
+
+    )
+
+    # BENCHMARK DDS
+    for symbol, curve in benchmark_curves.items():
+
+        dd = (
+
+            curve
+            / curve.cummax()
+
+            - 1
+
+        ) * 100
+
+        dd_fig.add_trace(
+
+            go.Scatter(
+
+                x=curve.index,
+
+                y=dd.values,
+
+                mode="lines",
+
+                name=symbol
+
+            )
+
+        )
+
+    dd_fig.update_layout(
+
+        title="Drawdown Comparison",
+
+        template="plotly_dark",
+
+        height=600
+
+    )
+
+    drawdown_chart = json.dumps(
+
+        dd_fig,
+
+        cls=plotly.utils.PlotlyJSONEncoder
+
+    )
+
+    return render_template(
+
+        "benchmarks.html",
+
+        report=report,
+
+        equity_chart=equity_chart,
+
+        drawdown_chart=drawdown_chart
+
+    )
 
 
-@app.route("/positions")
-def positions():
-    data = get_open_positions()
-    return render_template("positions.html", positions=data)
+# =====================================
+# TRADE ENTRY PAGE
+# =====================================
+@app.route("/trades")
+def trades():
+
+    data = get_dashboard_data()
+
+    return render_template(
+
+        "trades.html",
+
+        executed_trades=(
+            data["executed_trades"]
+            .to_dict(orient="records")
+        )
+
+    )
 
 
+# =====================================
+# HISTORY PAGE
+# =====================================
 @app.route("/history")
 def history():
-    data = get_trade_history()
-    return render_template("history.html", trades=data)
 
+    data = get_dashboard_data()
 
-@app.route("/performance")
-def performance():
-    stats = get_performance_stats()
-    return render_template("performance.html", stats=stats)
+    return render_template(
 
+        "history.html",
 
-# =========================
-# EXECUTION
-# =========================
-@app.route("/add_trade", methods=["POST"])
-def add_trade():
-    open_position(
-        request.form["symbol"],
-        float(request.form["entry"]),
-        float(request.form["stop"]),
-        int(request.form["shares"]),
-        setup=request.form.get("setup")  # 🔥 NEW
+        rebalance_history=(
+            data["rebalance_history"]
+            .to_dict(orient="records")
+        ),
+
+        executed_trades=(
+            data["executed_trades"]
+            .to_dict(orient="records")
+        )
+
     )
-    return redirect("/positions")
 
 
-@app.route("/close_trade", methods=["POST"])
-def close_trade():
-    symbol = request.form["symbol"]
-    exit_price = float(request.form["exit_price"])
-    shares = int(request.form["shares"])
-    grade = request.form.get("grade")
-    notes = request.form.get("notes")
+# =====================================
+# LOG TRADE
+# =====================================
+@app.route(
 
-    close_position(symbol, exit_price, shares, grade, notes)
+    "/log_trade",
 
-    return redirect("/positions")
+    methods=["POST"]
 
-@app.route("/setup_performance")
-def setup_performance():
-    data = get_setup_performance()
-    return render_template("setup_performance.html", data=data)
+)
+def log_trade():
 
-# =========================
-# CHART DATA
-# =========================
-@app.route("/chart_data/<symbol>")
-def chart_data(symbol):
-    df = yf.download(symbol, period="60d", interval="1h", auto_adjust=True)
+    symbol = request.form.get(
+        "symbol"
+    )
 
-    if df is None or df.empty:
-        return jsonify([])
+    side = request.form.get(
+        "side"
+    )
 
-    if hasattr(df.columns, "levels"):
-        df.columns = df.columns.get_level_values(0)
+    shares = int(
 
-    df = df.sort_index()
+        request.form.get(
+            "shares"
+        )
 
-    data = []
+    )
 
-    for idx, row in df.iterrows():
-        try:
-            data.append({
-                "time": int(idx.timestamp()),  # 🔥 seconds (correct)
-                "open": float(row["Open"]),
-                "high": float(row["High"]),
-                "low": float(row["Low"]),
-                "close": float(row["Close"])
-            })
-        except:
-            continue
+    fill_price = float(
 
-    return jsonify(data)
+        request.form.get(
+            "fill_price"
+        )
+
+    )
+
+    notes = request.form.get(
+        "notes"
+    )
+
+    total_value = (
+        shares * fill_price
+    )
+
+    conn = get_connection()
+
+    cur = conn.cursor()
+
+    cur.execute("""
+
+        INSERT INTO executed_trades (
+
+            date,
+            symbol,
+            side,
+            shares,
+            fill_price,
+            total_value,
+            notes
+
+        )
+
+        VALUES (
+
+            DATE('now'),
+
+            ?, ?, ?, ?, ?, ?
+
+        )
+
+    """, (
+
+        symbol.upper(),
+
+        side.upper(),
+
+        shares,
+
+        fill_price,
+
+        total_value,
+
+        notes
+
+    ))
+
+    conn.commit()
+
+    conn.close()
+
+    logger.info(
+
+        f"MANUAL TRADE | "
+        f"{side.upper()} "
+        f"{shares} "
+        f"{symbol.upper()} @ "
+        f"${fill_price:.2f}"
+
+    )
+
+    return redirect(
+        url_for("trades")
+    )
 
 
-# =========================
+# =====================================
 # RUN
-# =========================
+# =====================================
 if __name__ == "__main__":
-    app.run(debug=True)
+
+    app.run(
+
+        host=WEB_HOST,
+
+        port=WEB_PORT,
+
+        debug=True
+
+    )

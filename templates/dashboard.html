@@ -1,204 +1,171 @@
+<!-- templates/dashboard.html -->
+
 {% extends "base.html" %}
 
 {% block content %}
 
-<div class="container">
+<div class="grid">
 
-    <!-- ========================= -->
-    <!-- SYSTEM STATUS + SCAN -->
-    <!-- ========================= -->
     <div class="card">
-        <h2>🧠 System Status</h2>
 
-        <button onclick="startScan()" id="scanBtn" class="btn-primary">
-            🚀 Run Scan
-        </button>
+        <h2>
+            Market Regime
+        </h2>
 
-        <div class="progress-container">
-            <div id="progress-bar"></div>
+        <div class="metric">
+
+            {{ system_state.market_regime }}
+
         </div>
 
-        <p id="scan-status">Idle</p>
     </div>
 
-    <!-- ========================= -->
-    <!-- TOP SIGNALS -->
-    <!-- ========================= -->
-    {% if top5 and top5|length > 0 %}
     <div class="card">
-        <h2>🏆 Top Signals</h2>
 
-        <table class="styled-table">
-            <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th>Score</th>
-                    <th>Entry</th>
-                    <th>Stop</th>
-                    <th>Shares</th>
-                    <th>Weight</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in top5 %}
-                <tr>
-                    <td>
-                        <strong>{{ r.symbol }}</strong><br>
+        <h2>
+            Current Leader
+        </h2>
 
-                        <span class="badge">
-                            {{ r.setup or "Unknown" }}
-                        </span>
+        <div class="metric">
 
-                        {% if r.reasons %}
-                        <ul class="reason-list">
-                            {% for reason in r.reasons %}
-                            <li>{{ reason }}</li>
-                            {% endfor %}
-                        </ul>
-                        {% endif %}
-                    </td>
+            {{ system_state.current_leader }}
 
-                    <td>{{ "%.2f"|format(r.score) }}</td>
-                    <td>${{ "%.2f"|format(r.entry) }}</td>
-                    <td>${{ "%.2f"|format(r.stop) }}</td>
-                    <td>{{ r.shares }}</td>
-                    <td>{{ "%.2f"|format(r.weight) }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        </div>
+
     </div>
-    {% else %}
+
     <div class="card">
-        <h2>⚠️ No Signals Found</h2>
-        <p>Run scan to generate trade ideas.</p>
-    </div>
-    {% endif %}
 
-    <!-- ========================= -->
-    <!-- CHARTS -->
-    <!-- ========================= -->
-    {% if top5 %}
+        <h2>
+            Current Equity
+        </h2>
+
+        <div class="metric">
+
+            ${{ "{:,.2f}".format(
+            system_state.current_equity
+            ) }}
+
+        </div>
+
+    </div>
+
     <div class="card">
-        <h2>📊 Signal Charts</h2>
 
-        {% for r in top5 %}
-        <h3>{{ r.symbol }}</h3>
-        <div id="chart_{{ r.symbol }}" style="height:320px; width:100%;"></div>
-        <br>
-        {% endfor %}
+        <h2>
+            Current Cash
+        </h2>
+
+        <div class="metric">
+
+            ${{ "{:,.2f}".format(
+            system_state.current_cash
+            ) }}
+
+        </div>
+
     </div>
-    {% endif %}
+
+    <div class="card">
+
+        <h2>
+            Current Drawdown
+        </h2>
+
+        <div class="metric">
+
+            {{ drawdown }}%
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            CAGR
+        </h2>
+
+        <div class="metric">
+
+            {{ performance.cagr }}%
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Max Drawdown
+        </h2>
+
+        <div class="metric">
+
+            {{ performance.max_drawdown }}%
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Unrealized P/L
+        </h2>
+
+        <div class="metric">
+
+            ${{ "{:,.2f}".format(
+            pnl_summary.total_unrealized
+            ) }}
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Realized P/L
+        </h2>
+
+        <div class="metric">
+
+            ${{ "{:,.2f}".format(
+            pnl_summary.total_realized
+            ) }}
+
+        </div>
+
+    </div>
 
 </div>
 
-<!-- ========================= -->
-<!-- LIGHTWEIGHT CHARTS -->
-<!-- ========================= -->
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<div class="card">
+
+    <h2>
+        Portfolio Equity Curve
+    </h2>
+
+    <div id="equityChart"></div>
+
+</div>
 
 <script>
-    async function createChart(symbol, entry, stop) {
-        try {
-            const response = await fetch(`/chart_data/${symbol}`);
-            let data = await response.json();
 
-            if (!data || data.length === 0) return;
+    let equityChart = {{ equity_chart | safe }};
 
-            data = data.map(d => ({
-                time: Number(d.time),
-                open: Number(d.open),
-                high: Number(d.high),
-                low: Number(d.low),
-                close: Number(d.close)
-            }));
+    Plotly.newPlot(
 
-            const container = document.getElementById(`chart_${symbol}`);
-            if (!container) return;
+        'equityChart',
 
-            const chart = LightweightCharts.createChart(container, {
-                width: container.clientWidth,
-                height: 320,
-                layout: {
-                    background: { color: '#0b1220' },
-                    textColor: '#e2e8f0',
-                },
-                grid: {
-                    vertLines: { color: '#1e293b' },
-                    horzLines: { color: '#1e293b' },
-                },
-                timeScale: {
-                    timeVisible: true
-                }
-            });
+        equityChart.data,
 
-            const candleSeries = chart.addCandlestickSeries();
-            candleSeries.setData(data);
+        equityChart.layout
 
-            // ENTRY / STOP LINES
-            function addLine(price, color) {
-                const line = chart.addLineSeries({ color, lineWidth: 1 });
-                line.setData(data.map(d => ({
-                    time: d.time,
-                    value: price
-                })));
-            }
+    );
 
-            addLine(entry, '#22c55e');
-            addLine(stop, '#ef4444');
-
-            chart.timeScale().fitContent();
-
-        } catch (err) {
-            console.error("Chart error:", err);
-        }
-    }
-
-    function loadCharts() {
-        setTimeout(() => {
-            {% for r in top5 %}
-            createChart("{{ r.symbol }}", {{ r.entry }}, {{ r.stop }});
-    {% endfor %}
-    }, 200);
-}
-
-    document.addEventListener("DOMContentLoaded", loadCharts);
-</script>
-
-<!-- ========================= -->
-<!-- SCAN PROGRESS -->
-<!-- ========================= -->
-<script>
-    async function startScan() {
-        const btn = document.getElementById("scanBtn");
-        btn.disabled = true;
-        btn.innerText = "Running...";
-
-        await fetch("/run_scan");
-
-        pollProgress();
-    }
-
-    async function pollProgress() {
-        const res = await fetch("/scan_status");
-        const data = await res.json();
-
-        const percent = data.total > 0
-            ? Math.round((data.current / data.total) * 100)
-            : 0;
-
-        document.getElementById("scan-status").innerText = data.message;
-        document.getElementById("progress-bar").style.width = percent + "%";
-
-        if (data.running) {
-            setTimeout(pollProgress, 500);
-        } else {
-            document.getElementById("scanBtn").disabled = false;
-            document.getElementById("scanBtn").innerText = "🚀 Run Scan";
-
-            setTimeout(() => location.reload(), 1000);
-        }
-    }
 </script>
 
 {% endblock %}

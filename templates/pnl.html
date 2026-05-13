@@ -1,0 +1,163 @@
+<!-- templates/pnl.html -->
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="grid">
+
+    <div class="card">
+
+        <h2>
+            Total Unrealized P/L
+        </h2>
+
+        <div class="metric">
+
+            ${{ "{:,.2f}".format(
+            total_unrealized
+            ) }}
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Total Realized P/L
+        </h2>
+
+        <div class="metric">
+
+            ${{ "{:,.2f}".format(
+            total_realized
+            ) }}
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Unrealized Position P/L
+    </h2>
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Symbol</th>
+                <th>Shares</th>
+                <th>Entry Price</th>
+                <th>Current Price</th>
+                <th>Unrealized P/L</th>
+                <th>Return %</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for p in unrealized_positions %}
+
+            <tr>
+
+                <td>{{ p.symbol }}</td>
+
+                <td>{{ p.shares }}</td>
+
+                <td>
+                    ${{ "%.2f"|format(
+                    p.entry_price
+                    ) }}
+                </td>
+
+                <td>
+                    ${{ "%.2f"|format(
+                    p.current_price
+                    ) }}
+                </td>
+
+                <td>
+                    ${{ "{:,.2f}".format(
+                    p.unrealized_pnl
+                    ) }}
+                </td>
+
+                <td>
+                    {{ "%.2f"|format(
+                    p.unrealized_pct
+                    ) }}%
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Realized Trade P/L
+    </h2>
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Symbol</th>
+                <th>Shares</th>
+                <th>Sell Price</th>
+                <th>Realized P/L</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for t in realized_trades %}
+
+            <tr>
+
+                <td>{{ t.symbol }}</td>
+
+                <td>{{ t.shares }}</td>
+
+                <td>
+                    ${{ "%.2f"|format(
+                    t.sell_price
+                    ) }}
+                </td>
+
+                <td>
+                    ${{ "{:,.2f}".format(
+                    t.realized_pnl
+                    ) }}
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

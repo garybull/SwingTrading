@@ -1,57 +1,120 @@
+<!-- templates/history.html -->
+
 {% extends "base.html" %}
 
 {% block content %}
 
-<div class="container">
+<div class="card">
 
-    <h2 class="section-title">📜 Trade History</h2>
+    <h2>
+        Executed Trades
+    </h2>
 
-    {% if trades and trades|length > 0 %}
-    <div class="card">
+    <table>
 
-        <table class="styled-table">
-            <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th>Entry</th>
-                    <th>Exit</th>
-                    <th>Shares</th>
-                    <th>PnL</th>
-                    <th>R</th>
-                    <th>Grade</th>
-                    <th>Notes</th>
-                </tr>
-            </thead>
+        <thead>
 
-            <tbody>
-                {% for t in trades %}
-                <tr>
-                    <td>{{ t.symbol }}</td>
-                    <td>${{ "%.2f"|format(t.entry) }}</td>
-                    <td>${{ "%.2f"|format(t.exit) }}</td>
-                    <td>{{ t.shares }}</td>
+            <tr>
 
-                    <td style="color:
-                        {% if t.pnl > 0 %}#22c55e
-                        {% elif t.pnl < 0 %}#ef4444
-                        {% else %}#e2e8f0{% endif %}
-                    ">
-                        {{ "%.2f"|format(t.pnl) }}
-                    </td>
+                <th>Date</th>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Shares</th>
+                <th>Fill Price</th>
+                <th>Total Value</th>
+                <th>Notes</th>
 
-                    <td>{{ "%.2f"|format(t.r) }}R</td>
-                    <td>{{ t.grade if t.grade else "-" }}</td>
-                    <td>{{ t.notes if t.notes else "-" }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
+            </tr>
 
-        </table>
+        </thead>
 
-    </div>
-    {% else %}
-    <p>No closed trades yet.</p>
-    {% endif %}
+        <tbody>
+
+            {% for t in executed_trades %}
+
+            <tr>
+
+                <td>{{ t.date }}</td>
+
+                <td>{{ t.symbol }}</td>
+
+                <td>{{ t.side }}</td>
+
+                <td>{{ t.shares }}</td>
+
+                <td>
+                    ${{ "%.2f"|format(
+                    t.fill_price
+                    ) }}
+                </td>
+
+                <td>
+                    ${{ "{:,.2f}".format(
+                    t.total_value
+                    ) }}
+                </td>
+
+                <td>{{ t.notes }}</td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Rebalance History
+    </h2>
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Date</th>
+                <th>Symbol</th>
+                <th>Action</th>
+                <th>Shares</th>
+                <th>Price</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for r in rebalance_history %}
+
+            <tr>
+
+                <td>{{ r.date }}</td>
+
+                <td>{{ r.symbol }}</td>
+
+                <td>{{ r.action }}</td>
+
+                <td>{{ r.shares }}</td>
+
+                <td>
+                    ${{ "%.2f"|format(
+                    r.price
+                    ) }}
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
 
 </div>
 

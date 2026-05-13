@@ -1,0 +1,203 @@
+<!-- templates/benchmarks.html -->
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card">
+
+    <h2>
+        Benchmark Comparison
+    </h2>
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Metric</th>
+                <th>SYSTEM</th>
+                <th>SPY</th>
+                <th>QQQ</th>
+                <th>TQQQ</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            <tr>
+
+                <td>Final Equity</td>
+
+                <td>
+                    ${{ "{:,.0f}".format(
+                    report["SYSTEM"]["final_equity"]
+                    ) }}
+                </td>
+
+                <td>
+                    ${{ "{:,.0f}".format(
+                    report["SPY"]["final_equity"]
+                    ) }}
+                </td>
+
+                <td>
+                    ${{ "{:,.0f}".format(
+                    report["QQQ"]["final_equity"]
+                    ) }}
+                </td>
+
+                <td>
+                    ${{ "{:,.0f}".format(
+                    report["TQQQ"]["final_equity"]
+                    ) }}
+                </td>
+
+            </tr>
+
+            <tr>
+
+                <td>CAGR</td>
+
+                <td>
+                    {{ report["SYSTEM"]["cagr"] }}%
+                </td>
+
+                <td>
+                    {{ report["SPY"]["cagr"] }}%
+                </td>
+
+                <td>
+                    {{ report["QQQ"]["cagr"] }}%
+                </td>
+
+                <td>
+                    {{ report["TQQQ"]["cagr"] }}%
+                </td>
+
+            </tr>
+
+            <tr>
+
+                <td>Max Drawdown</td>
+
+                <td>
+                    {{ report["SYSTEM"]["max_drawdown"] }}%
+                </td>
+
+                <td>
+                    {{ report["SPY"]["max_drawdown"] }}%
+                </td>
+
+                <td>
+                    {{ report["QQQ"]["max_drawdown"] }}%
+                </td>
+
+                <td>
+                    {{ report["TQQQ"]["max_drawdown"] }}%
+                </td>
+
+            </tr>
+
+            <tr>
+
+                <td>Sharpe Ratio</td>
+
+                <td>
+                    {{ report["SYSTEM"]["sharpe"] }}
+                </td>
+
+                <td>
+                    {{ report["SPY"]["sharpe"] }}
+                </td>
+
+                <td>
+                    {{ report["QQQ"]["sharpe"] }}
+                </td>
+
+                <td>
+                    {{ report["TQQQ"]["sharpe"] }}
+                </td>
+
+            </tr>
+
+            <tr>
+
+                <td>Sortino Ratio</td>
+
+                <td>
+                    {{ report["SYSTEM"]["sortino"] }}
+                </td>
+
+                <td>
+                    {{ report["SPY"]["sortino"] }}
+                </td>
+
+                <td>
+                    {{ report["QQQ"]["sortino"] }}
+                </td>
+
+                <td>
+                    {{ report["TQQQ"]["sortino"] }}
+                </td>
+
+            </tr>
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Equity Curve Comparison
+    </h2>
+
+    <div id="equityChart"></div>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Drawdown Comparison
+    </h2>
+
+    <div id="drawdownChart"></div>
+
+</div>
+
+<script>
+
+    let equityChart = {{ equity_chart | safe }};
+
+    Plotly.newPlot(
+
+        'equityChart',
+
+        equityChart.data,
+
+        equityChart.layout
+
+    );
+
+    let drawdownChart = {{ drawdown_chart | safe }};
+
+    Plotly.newPlot(
+
+        'drawdownChart',
+
+        drawdownChart.data,
+
+        drawdownChart.layout
+
+    );
+
+</script>
+
+{% endblock %}
