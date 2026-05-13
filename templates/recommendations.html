@@ -3,6 +3,7 @@
 {% extends "base.html" %}
 
 {% block content %}
+
 <div class="card">
 
     <h2>
@@ -20,6 +21,28 @@
     </form>
 
 </div>
+
+{% if warnings %}
+
+<div class="card">
+
+    <h2>
+        Risk Warnings
+    </h2>
+
+    {% for w in warnings %}
+
+    <p class="negative">
+
+        {{ w }}
+
+    </p>
+
+    {% endfor %}
+
+</div>
+
+{% endif %}
 
 <div class="card">
 
@@ -48,22 +71,30 @@
 
             <tr>
 
-                <td>{{ r.symbol }}</td>
+                <td>
+                    {{ r.symbol }}
+                </td>
 
                 <td>
+
                     {{ "%.2f"|format(
                     r.target_allocation * 100
                     ) }}%
+
                 </td>
 
                 <td>
+
                     {{ "%.2f"|format(
                     r.score
                     ) }}
+
                 </td>
 
                 <td>
+
                     {{ r.action }}
+
                 </td>
 
             </tr>
@@ -103,20 +134,28 @@
 
             <tr>
 
-                <td>{{ p.symbol }}</td>
-
-                <td>{{ p.shares }}</td>
-
                 <td>
-                    {{ "%.2f"|format(
-                    p.allocation_pct * 100
-                    ) }}%
+                    {{ p.symbol }}
                 </td>
 
                 <td>
+                    {{ p.shares }}
+                </td>
+
+                <td>
+
+                    {{ "%.2f"|format(
+                    p.allocation_pct * 100
+                    ) }}%
+
+                </td>
+
+                <td>
+
                     ${{ "{:,.2f}".format(
                     p.market_value
                     ) }}
+
                 </td>
 
             </tr>
@@ -151,18 +190,28 @@
 
         <tbody>
 
-            {% for r in rankings %}
+            {% for r in momentum_rankings %}
 
             <tr>
 
-                <td>{{ r.rank }}</td>
+                <td>
 
-                <td>{{ r.symbol }}</td>
+                    {{ loop.index }}
+
+                </td>
 
                 <td>
+
+                    {{ r.symbol }}
+
+                </td>
+
+                <td>
+
                     {{ "%.2f"|format(
                     r.score
                     ) }}
+
                 </td>
 
             </tr>
@@ -174,5 +223,149 @@
     </table>
 
 </div>
+
+<div class="card">
+
+    <h2>
+        Hourly Trade Setups
+    </h2>
+
+</div>
+
+{% for c in recommendation_charts %}
+
+<div class="card">
+
+    <div class="grid">
+
+        <div>
+
+            <h2>
+
+                {{ c.symbol }}
+
+            </h2>
+
+            <p>
+
+                Entry:
+
+                <strong>
+
+                    ${{ c.entry }}
+
+                </strong>
+
+            </p>
+
+            <p>
+
+                Stop:
+
+                <strong class="negative">
+
+                    ${{ c.stop }}
+
+                </strong>
+
+            </p>
+
+            <p>
+
+                Target 1:
+
+                <strong class="positive">
+
+                    ${{ c.target_1 }}
+
+                </strong>
+
+            </p>
+
+            <p>
+
+                Target 2:
+
+                <strong class="positive">
+
+                    ${{ c.target_2 }}
+
+                </strong>
+
+            </p>
+
+            <p>
+
+                Risk:
+
+                <strong class="negative">
+
+                    {{ c.risk_pct }}%
+
+                </strong>
+
+            </p>
+
+            <p>
+
+                Reward:
+
+                <strong class="positive">
+
+                    {{ c.reward_pct }}%
+
+                </strong>
+
+            </p>
+
+            <p>
+
+                Risk / Reward:
+
+                <strong>
+
+                    {{ c.rr_ratio }}R
+
+                </strong>
+
+            </p>
+
+        </div>
+
+    </div>
+
+    <div id="chart_{{ c.symbol }}" style="height:700px; width:100%;"></div>
+
+</div>
+
+<script>
+
+    let chart_{{ c.symbol }} =
+
+        JSON.parse(
+            `{{ c.chart | safe }}`
+        );
+
+    Plotly.newPlot(
+
+        'chart_{{ c.symbol }}',
+
+        chart_{{ c.symbol }}.data,
+
+        chart_{{ c.symbol }}.layout,
+
+        {
+
+            responsive: true,
+
+            scrollZoom: true
+
+        }
+
+    );
+
+</script>
+
+{% endfor %}
 
 {% endblock %}

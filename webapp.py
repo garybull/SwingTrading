@@ -1,9 +1,15 @@
 # webapp.py
-
+import pandas as pd
 import sqlite3
 import json
 import plotly.graph_objs as go
 import plotly.utils
+from app.chart_engine import (
+    build_recommendation_chart
+)
+from app.recommendation_engine import (
+    build_action_plan
+)
 from flask import (
 
     Flask,
@@ -137,31 +143,171 @@ def dashboard():
 
 
 # =====================================
-# RECOMMENDATIONS PAGE
+# RECOMMENDATIONS
 # =====================================
 @app.route("/recommendations")
 def recommendations():
 
-    data = get_dashboard_data()
+    conn = get_connection()
 
+    # =====================================
+    # RECOMMENDED PORTFOLIO
+    # =====================================
+    recommended_portfolio = pd.read_sql_query(
+
+        """
+
+        SELECT *
+
+        FROM recommended_portfolio
+
+        ORDER BY target_allocation DESC
+
+        """,
+
+        conn
+
+    )
+
+    # =====================================
+    # MOMENTUM RANKINGS
+    # =====================================
+    momentum_rankings = pd.read_sql_query(
+
+        """
+
+        SELECT *
+
+        FROM rankings
+
+        ORDER BY score DESC
+
+        LIMIT 25
+
+        """,
+
+        conn
+
+    )
+
+    conn.close()
+
+    # =====================================
+    # ACTION PLAN
+    # =====================================
+    actions = build_action_plan(
+        recommended_portfolio
+    )
+
+    # =====================================
+    # CHARTS
+    # =====================================
+    recommendation_charts = []
+    print(recommendation_charts)
+    if not recommended_portfolio.empty:
+
+        for _, row in recommended_portfolio.iterrows():
+
+            symbol = row["symbol"]
+
+            try:
+
+                chart_data = (
+
+                    build_recommendation_chart(
+                        symbol
+                    )
+
+                )
+
+                if chart_data:
+
+                    recommendation_charts.append(
+                        chart_data
+                    )
+
+            except Exception as e:
+
+                logger.error(
+
+                    f"Chart failed for "
+                    f"{symbol}: {e}"
+
+                )
+
+    # =====================================
+    # RISK WARNINGS
+    # =====================================
+    warnings = []
+
+    try:
+
+        from app.risk_engine import (
+            get_risk_report
+        )
+
+        risk = get_risk_report()
+
+        exposure = risk[
+            "effective_exposure"
+        ]
+
+        if exposure > 250:
+
+            warnings.append(
+
+                "🔴 Extreme leverage "
+                "detected"
+
+            )
+
+        elif exposure > 180:
+
+            warnings.append(
+
+                "⚠️ Aggressive "
+                "portfolio exposure"
+
+            )
+
+    except Exception as e:
+
+        logger.error(
+            f"Risk warning failed: {e}"
+        )
+
+    # =====================================
+    # RENDER
+    # =====================================
     return render_template(
 
         "recommendations.html",
 
         recommended_portfolio=(
-            data["recommended_portfolio"]
-            .to_dict(orient="records")
+
+            recommended_portfolio
+            .to_dict(
+                orient="records"
+            )
+
         ),
 
-        positions=(
-            data["positions"]
-            .to_dict(orient="records")
+        momentum_rankings=(
+
+            momentum_rankings
+            .to_dict(
+                orient="records"
+            )
+
         ),
 
-        rankings=(
-            data["rankings"]
-            .to_dict(orient="records")
-        )
+        actions=actions,
+
+        recommendation_charts=(
+            recommendation_charts
+        ),
+
+        warnings=warnings
 
     )
 
