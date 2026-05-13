@@ -353,6 +353,13 @@ def get_current_drawdown(equity_curve):
 
     )
 
+    # =====================================
+    # SAFETY
+    # =====================================
+    if peak_equity <= 0:
+
+        return 0
+
     drawdown = (
 
         (
@@ -368,7 +375,6 @@ def get_current_drawdown(equity_curve):
         abs(drawdown),
         2
     )
-
 
 # =====================================
 # DASHBOARD DATA
