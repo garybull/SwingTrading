@@ -508,6 +508,301 @@ def history():
 
     )
 
+# =====================================
+# RISK DASHBOARD
+# =====================================
+@app.route("/risk")
+def risk():
+
+    from app.risk_engine import (
+        get_risk_report
+    )
+
+    risk_data = (
+        get_risk_report()
+    )
+
+    return render_template(
+
+        "risk.html",
+
+        risk=risk_data
+
+    )
+
+
+# =====================================
+# ROLLING ANALYTICS
+# =====================================
+@app.route("/rolling-analytics")
+def rolling_analytics():
+
+    from app.rolling_analytics import (
+        get_rolling_analytics
+    )
+
+    rolling = (
+        get_rolling_analytics()
+    )
+
+    # =====================================
+    # EMPTY SAFETY
+    # =====================================
+    if rolling.empty:
+
+        return render_template(
+
+            "rolling_analytics.html",
+
+            rolling_metrics=[],
+
+            return_chart="{}",
+
+            sharpe_chart="{}",
+
+            drawdown_chart="{}",
+
+            volatility_chart="{}"
+
+        )
+
+    # =====================================
+    # RETURN CHART
+    # =====================================
+    return_fig = go.Figure()
+
+    return_fig.add_trace(
+
+        go.Scatter(
+
+            x=rolling["date"],
+
+            y=rolling[
+                "rolling_30d_return"
+            ],
+
+            mode="lines",
+
+            name="30D Return"
+
+        )
+
+    )
+
+    return_fig.update_layout(
+
+        title="Rolling 30-Day Return",
+
+        template="plotly_dark",
+
+        height=500
+
+    )
+
+    return_chart = json.dumps(
+
+        return_fig,
+
+        cls=plotly.utils.PlotlyJSONEncoder
+
+    )
+
+    # =====================================
+    # SHARPE CHART
+    # =====================================
+    sharpe_fig = go.Figure()
+
+    sharpe_fig.add_trace(
+
+        go.Scatter(
+
+            x=rolling["date"],
+
+            y=rolling[
+                "rolling_sharpe"
+            ],
+
+            mode="lines",
+
+            name="Rolling Sharpe"
+
+        )
+
+    )
+
+    sharpe_fig.update_layout(
+
+        title="Rolling Sharpe Ratio",
+
+        template="plotly_dark",
+
+        height=500
+
+    )
+
+    sharpe_chart = json.dumps(
+
+        sharpe_fig,
+
+        cls=plotly.utils.PlotlyJSONEncoder
+
+    )
+
+    # =====================================
+    # DRAWDOWN CHART
+    # =====================================
+    drawdown_fig = go.Figure()
+
+    drawdown_fig.add_trace(
+
+        go.Scatter(
+
+            x=rolling["date"],
+
+            y=rolling[
+                "rolling_drawdown"
+            ],
+
+            mode="lines",
+
+            name="Drawdown"
+
+        )
+
+    )
+
+    drawdown_fig.update_layout(
+
+        title="Rolling Drawdown",
+
+        template="plotly_dark",
+
+        height=500
+
+    )
+
+    drawdown_chart = json.dumps(
+
+        drawdown_fig,
+
+        cls=plotly.utils.PlotlyJSONEncoder
+
+    )
+
+    # =====================================
+    # VOLATILITY CHART
+    # =====================================
+    volatility_fig = go.Figure()
+
+    volatility_fig.add_trace(
+
+        go.Scatter(
+
+            x=rolling["date"],
+
+            y=rolling[
+                "rolling_volatility"
+            ],
+
+            mode="lines",
+
+            name="Volatility"
+
+        )
+
+    )
+
+    volatility_fig.update_layout(
+
+        title="Rolling Volatility",
+
+        template="plotly_dark",
+
+        height=500
+
+    )
+
+    volatility_chart = json.dumps(
+
+        volatility_fig,
+
+        cls=plotly.utils.PlotlyJSONEncoder
+
+    )
+
+    # =====================================
+    # LATEST METRICS
+    # =====================================
+    latest = rolling.iloc[-1]
+
+    metrics = {
+
+        "rolling_30d_return":
+
+            round(
+
+                latest[
+                    "rolling_30d_return"
+                ],
+
+                2
+
+            ),
+
+        "rolling_sharpe":
+
+            round(
+
+                latest[
+                    "rolling_sharpe"
+                ],
+
+                2
+
+            ),
+
+        "rolling_drawdown":
+
+            round(
+
+                latest[
+                    "rolling_drawdown"
+                ],
+
+                2
+
+            ),
+
+        "rolling_volatility":
+
+            round(
+
+                latest[
+                    "rolling_volatility"
+                ],
+
+                2
+
+            )
+
+    }
+
+    return render_template(
+
+        "rolling_analytics.html",
+
+        rolling_metrics=metrics,
+
+        return_chart=return_chart,
+
+        sharpe_chart=sharpe_chart,
+
+        drawdown_chart=drawdown_chart,
+
+        volatility_chart=volatility_chart
+
+    )
+
 
 # =====================================
 # LOG TRADE

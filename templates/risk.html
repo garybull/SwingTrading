@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="grid">
+
+    <div class="card">
+
+        <h2>
+            Effective Exposure
+        </h2>
+
+        <div class="metric">
+
+            {{ risk.effective_exposure }}%
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Risk Status
+        </h2>
+
+        <div class="metric">
+
+            {% if risk.risk_status == "Extreme" %}
+
+            <span class="negative">
+
+                {% elif risk.risk_status == "Aggressive" %}
+
+                <span class="warning">
+
+                    {% else %}
+
+                    <span class="positive">
+
+                        {% endif %}
+
+                        {{ risk.risk_status }}
+
+                    </span>
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Cash %
+        </h2>
+
+        <div class="metric">
+
+            {{ risk.cash_pct }}%
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Largest Position
+        </h2>
+
+        <div class="metric">
+
+            {{ risk.largest_position }}%
+
+        </div>
+
+    </div>
+
+</div>
+
+{% if risk.effective_exposure > 250 %}
+
+<div class="card">
+
+    <h2 class="negative">
+        ⚠️ EXTREME LEVERAGE WARNING
+    </h2>
+
+    <p>
+
+        Portfolio effective exposure exceeds
+        250%.
+
+    </p>
+
+</div>
+
+{% endif %}
+
+<div class="card">
+
+    <h2>
+        Position Exposure Breakdown
+    </h2>
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Symbol</th>
+                <th>Allocation %</th>
+                <th>Leverage</th>
+                <th>Effective Exposure</th>
+                <th>Market Value</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for p in risk.positions %}
+
+            <tr>
+
+                <td>
+                    {{ p.symbol }}
+                </td>
+
+                <td>
+                    {{ "%.2f"|format(
+                    p.allocation_pct
+                    ) }}%
+                </td>
+
+                <td>
+                    {{ p.leverage }}x
+                </td>
+
+                <td>
+
+                    {% if p.effective_exposure > 75 %}
+
+                    <span class="negative">
+
+                        {% elif p.effective_exposure > 40 %}
+
+                        <span class="warning">
+
+                            {% else %}
+
+                            <span class="positive">
+
+                                {% endif %}
+
+                                {{ "%.2f"|format(
+                                p.effective_exposure
+                                ) }}%
+
+                            </span>
+
+                </td>
+
+                <td>
+                    ${{ "{:,.2f}".format(
+                    p.market_value
+                    ) }}
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

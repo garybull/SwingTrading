@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="grid">
+
+    <div class="card">
+
+        <h2>
+            Rolling 30D Return
+        </h2>
+
+        <div class="metric">
+
+            {{ rolling_metrics.rolling_30d_return }}%
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Rolling Sharpe
+        </h2>
+
+        <div class="metric">
+
+            {{ rolling_metrics.rolling_sharpe }}
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Rolling Drawdown
+        </h2>
+
+        <div class="metric negative">
+
+            {{ rolling_metrics.rolling_drawdown }}%
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>
+            Rolling Volatility
+        </h2>
+
+        <div class="metric warning">
+
+            {{ rolling_metrics.rolling_volatility }}%
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Rolling 30-Day Return
+    </h2>
+
+    <div id="returnChart"></div>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Rolling Sharpe Ratio
+    </h2>
+
+    <div id="sharpeChart"></div>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Rolling Drawdown
+    </h2>
+
+    <div id="drawdownChart"></div>
+
+</div>
+
+<div class="card">
+
+    <h2>
+        Rolling Volatility
+    </h2>
+
+    <div id="volatilityChart"></div>
+
+</div>
+
+<script>
+
+    let returnChart = {{ return_chart | safe }};
+
+    Plotly.newPlot(
+
+        'returnChart',
+
+        returnChart.data,
+
+        returnChart.layout
+
+    );
+
+    let sharpeChart = {{ sharpe_chart | safe }};
+
+    Plotly.newPlot(
+
+        'sharpeChart',
+
+        sharpeChart.data,
+
+        sharpeChart.layout
+
+    );
+
+    let drawdownChart = {{ drawdown_chart | safe }};
+
+    Plotly.newPlot(
+
+        'drawdownChart',
+
+        drawdownChart.data,
+
+        drawdownChart.layout
+
+    );
+
+    let volatilityChart = {{ volatility_chart | safe }};
+
+    Plotly.newPlot(
+
+        'volatilityChart',
+
+        volatilityChart.data,
+
+        volatilityChart.layout
+
+    );
+
+</script>
+
+{% endblock %}
