@@ -22,12 +22,36 @@
 
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
         * {
 
             box-sizing: border-box;
+
+        }
+
+        :root {
+
+            --bg-top: #0b1220;
+            --bg-mid: #111827;
+            --bg-bottom: #172033;
+
+            --card-top: rgba(28, 39, 61, 0.92);
+            --card-bottom: rgba(18, 24, 38, 0.96);
+
+            --border: rgba(255, 255, 255, 0.07);
+
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+
+            --blue: #4f8cff;
+            --blue-hover: #70a5ff;
+
+            --green: #34d399;
+            --red: #f87171;
+            --yellow: #fbbf24;
 
         }
 
@@ -39,11 +63,19 @@
 
             font-family: 'Inter', sans-serif;
 
-            background: linear-gradient(180deg,
-                    #081224 0%,
-                    #0f172a 100%);
+            background:
 
-            color: #f1f5f9;
+                linear-gradient(180deg,
+
+                    var(--bg-top) 0%,
+
+                    var(--bg-mid) 45%,
+
+                    var(--bg-bottom) 100%);
+
+            color: var(--text-primary);
+
+            min-height: 100vh;
 
         }
 
@@ -59,7 +91,7 @@
 
             width: 100%;
 
-            max-width: 2000px;
+            max-width: 1900px;
 
             margin: 0 auto;
 
@@ -67,23 +99,131 @@
 
         }
 
+        /* =====================================
+           HEADER
+        ===================================== */
+
         .header {
 
-            margin-bottom: 28px;
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            gap: 24px;
+
+            flex-wrap: wrap;
+
+            margin-bottom: 24px;
+
+        }
+
+        .brand {
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 8px;
 
         }
 
         .title {
 
-            font-size: 54px;
+            font-size: 48px;
 
             font-weight: 800;
 
-            margin-bottom: 24px;
+            letter-spacing: -1.5px;
 
-            letter-spacing: -1px;
+            color: white;
 
         }
+
+        .subtitle {
+
+            color: var(--text-muted);
+
+            font-size: 15px;
+
+            font-weight: 500;
+
+        }
+
+        /* =====================================
+           STATUS BAR
+        ===================================== */
+
+        .status-bar {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 14px;
+
+            padding: 14px 18px;
+
+            border-radius: 18px;
+
+            background: rgba(255, 255, 255, 0.05);
+
+            border: 1px solid var(--border);
+
+            backdrop-filter: blur(14px);
+
+        }
+
+        .live-dot {
+
+            width: 10px;
+
+            height: 10px;
+
+            border-radius: 50%;
+
+            background: var(--green);
+
+            box-shadow:
+
+                0 0 12px rgba(52, 211, 153, 0.8);
+
+            animation: pulse 2s infinite;
+
+        }
+
+        @keyframes pulse {
+
+            0% {
+
+                transform: scale(1);
+
+                opacity: 1;
+
+            }
+
+            50% {
+
+                transform: scale(1.2);
+
+                opacity: 0.7;
+
+            }
+
+            100% {
+
+                transform: scale(1);
+
+                opacity: 1;
+
+            }
+
+        }
+
+        /* =====================================
+           NAV
+        ===================================== */
 
         .nav {
 
@@ -91,46 +231,87 @@
 
             flex-wrap: wrap;
 
-            gap: 18px;
+            gap: 12px;
+
+            margin-bottom: 28px;
+
+            padding: 12px;
+
+            border-radius: 22px;
+
+            background: rgba(255, 255, 255, 0.05);
+
+            border: 1px solid var(--border);
+
+            backdrop-filter: blur(14px);
+
+            box-shadow:
+
+                0 10px 35px rgba(0, 0, 0, 0.22);
 
         }
 
         .nav a {
 
-            padding: 14px 22px;
-
-            background: rgba(255, 255, 255, 0.08);
+            padding: 12px 18px;
 
             border-radius: 14px;
 
+            font-size: 14px;
+
             font-weight: 600;
 
-            transition: all 0.2s ease;
+            color: var(--text-secondary);
+
+            transition: all 0.18s ease;
 
         }
 
         .nav a:hover {
 
-            background: rgba(59, 130, 246, 0.4);
+            background:
 
-            transform: translateY(-2px);
+                linear-gradient(135deg,
+
+                    rgba(79, 140, 255, 0.22),
+
+                    rgba(79, 140, 255, 0.12));
+
+            border: 1px solid rgba(79, 140, 255, 0.22);
+
+            color: white;
+
+            transform: translateY(-1px);
 
         }
 
+        /* =====================================
+           CARDS
+        ===================================== */
+
         .card {
 
-            background: rgba(255, 255, 255, 0.08);
+            background:
 
-            border-radius: 20px;
+                linear-gradient(180deg,
 
-            padding: 28px;
+                    var(--card-top),
 
-            margin-bottom: 28px;
+                    var(--card-bottom));
+
+            border-radius: 24px;
+
+            padding: 24px;
+
+            margin-bottom: 24px;
+
+            border: 1px solid var(--border);
 
             box-shadow:
-                0 8px 30px rgba(0, 0, 0, 0.25);
 
-            backdrop-filter: blur(10px);
+                0 12px 40px rgba(0, 0, 0, 0.28);
+
+            backdrop-filter: blur(18px);
 
         }
 
@@ -140,17 +321,33 @@
 
             margin-top: 0;
 
-            color: #f8fafc;
+            color: white;
 
         }
 
         h2 {
 
-            font-size: 28px;
+            font-size: 24px;
 
-            margin-bottom: 22px;
+            font-weight: 700;
+
+            margin-bottom: 18px;
+
+            letter-spacing: -0.5px;
 
         }
+
+        p {
+
+            color: var(--text-secondary);
+
+            line-height: 1.5;
+
+        }
+
+        /* =====================================
+           TABLES
+        ===================================== */
 
         table {
 
@@ -164,57 +361,83 @@
 
             text-align: left;
 
-            padding: 16px 12px;
+            padding: 14px 10px;
 
-            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+            border-bottom: 1px solid var(--border);
 
-            color: #9ca3af;
+            color: #7c93b6;
 
-            font-size: 14px;
+            font-size: 12px;
 
             text-transform: uppercase;
+
+            letter-spacing: 0.08em;
+
+            font-weight: 700;
 
         }
 
         td {
 
-            padding: 18px 12px;
+            padding: 16px 10px;
 
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 
-            font-size: 16px;
+            font-size: 15px;
+
+            color: var(--text-secondary);
+
+            font-weight: 500;
+
+        }
+
+        tr {
+
+            transition: background 0.15s ease;
 
         }
 
         tr:hover {
 
-            background: rgba(255, 255, 255, 0.04);
+            background: rgba(79, 140, 255, 0.05);
 
         }
+
+        /* =====================================
+           BUTTONS
+        ===================================== */
 
         button {
 
             width: 100%;
 
-            background: linear-gradient(135deg,
-                    #2563eb,
-                    #3b82f6);
+            background:
+
+                linear-gradient(135deg,
+
+                    #3b82f6,
+
+                    #2563eb);
 
             color: white;
 
-            border: none;
+            border: 1px solid rgba(255, 255, 255, 0.08);
 
-            padding: 16px;
+            padding: 15px;
 
-            border-radius: 12px;
+            border-radius: 14px;
 
-            font-size: 16px;
+            font-size: 15px;
 
             font-weight: 700;
 
             cursor: pointer;
 
-            transition: all 0.2s ease;
+            transition: all 0.18s ease;
+
+            box-shadow:
+
+                0 6px 24px rgba(37, 99, 235, 0.28);
 
         }
 
@@ -222,17 +445,25 @@
 
             transform: translateY(-1px);
 
-            opacity: 0.95;
+            opacity: 0.98;
+
+            box-shadow:
+
+                0 10px 28px rgba(37, 99, 235, 0.38);
 
         }
 
         button:disabled {
 
-            opacity: 0.6;
+            opacity: 0.55;
 
             cursor: not-allowed;
 
         }
+
+        /* =====================================
+           INPUTS
+        ===================================== */
 
         input,
         select {
@@ -245,15 +476,30 @@
 
             margin-bottom: 18px;
 
-            border-radius: 10px;
+            border-radius: 14px;
 
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            border: 1px solid var(--border);
 
-            background: rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.05);
 
             color: white;
 
             font-size: 15px;
+
+            transition: all 0.18s ease;
+
+            outline: none;
+
+        }
+
+        input:focus,
+        select:focus {
+
+            border: 1px solid rgba(79, 140, 255, 0.45);
+
+            box-shadow:
+
+                0 0 0 4px rgba(79, 140, 255, 0.12);
 
         }
 
@@ -265,7 +511,13 @@
 
             margin-bottom: 6px;
 
+            color: var(--text-secondary);
+
         }
+
+        /* =====================================
+           HELPERS
+        ===================================== */
 
         .grid {
 
@@ -274,13 +526,13 @@
             grid-template-columns: repeat(auto-fit,
                     minmax(320px, 1fr));
 
-            gap: 24px;
+            gap: 22px;
 
         }
 
         .positive {
 
-            color: #34d399;
+            color: var(--green);
 
             font-weight: 700;
 
@@ -288,7 +540,7 @@
 
         .negative {
 
-            color: #ef4444;
+            color: var(--red);
 
             font-weight: 700;
 
@@ -296,15 +548,15 @@
 
         .warning {
 
-            color: #facc15;
+            color: var(--yellow);
 
-            font-weight: 600;
+            font-weight: 700;
 
         }
 
         .muted {
 
-            color: #9ca3af;
+            color: var(--text-muted);
 
         }
 
@@ -316,27 +568,35 @@
 
             margin-top: 8px;
 
+            letter-spacing: -1px;
+
         }
 
         .submetric {
 
-            font-size: 14px;
+            font-size: 13px;
 
-            color: #94a3b8;
+            color: var(--text-muted);
+
+            margin-top: 6px;
 
         }
 
+        /* =====================================
+           SPINNER
+        ===================================== */
+
         .spinner {
 
-            border: 6px solid #2a3447;
+            border: 6px solid rgba(255, 255, 255, 0.08);
 
-            border-top: 6px solid #3b82f6;
+            border-top: 6px solid var(--blue);
 
             border-radius: 50%;
 
-            width: 40px;
+            width: 42px;
 
-            height: 40px;
+            height: 42px;
 
             animation: spin 1s linear infinite;
 
@@ -372,7 +632,7 @@
 
             font-weight: 700;
 
-            background: rgba(59, 130, 246, 0.2);
+            background: rgba(59, 130, 246, 0.18);
 
             color: #93c5fd;
 
@@ -404,21 +664,21 @@
 
             .title {
 
-                font-size: 36px;
+                font-size: 34px;
 
             }
 
             .nav {
 
-                gap: 10px;
+                gap: 8px;
 
             }
 
             .nav a {
 
-                padding: 12px 16px;
+                padding: 10px 14px;
 
-                font-size: 14px;
+                font-size: 13px;
 
             }
 
@@ -445,51 +705,79 @@
 
         <div class="header">
 
-            <div class="title">
+            <div class="brand">
 
-                🐂 Bull Analytics and Trading Engine 📈 🚀
+                <div class="title">
+
+                    🐂 Bull Analytics
+
+                </div>
+
+                <div class="subtitle">
+
+                    Systematic Momentum Trading Platform
+
+                </div>
+
+            </div>
+
+            <div class="status-bar">
+
+                <div class="live-dot"></div>
+
+                <div>
+
+                    <div style="font-weight:700;">
+                        LIVE MARKET DATA
+                    </div>
+
+                    <div class="muted" style="font-size:13px;">
+                        AWS Connected
+                    </div>
+
+                </div>
 
             </div>
 
-            <div class="nav">
+        </div>
 
-                <a href="/">
-                    Dashboard
-                </a>
+        <div class="nav">
 
-                <a href="/recommendations">
-                    Recommendations
-                </a>
+            <a href="/">
+                Dashboard
+            </a>
 
-                <a href="/execute_trade">
-                    Execute Trades
-                </a>
+            <a href="/recommendations">
+                Recommendations
+            </a>
 
-                <a href="/history">
-                    History
-                </a>
+            <a href="/trades">
+                Execute Trades
+            </a>
 
-                <a href="/pl_analytics">
-                    P/L Analytics
-                </a>
+            <a href="/history">
+                History
+            </a>
 
-                <a href="/benchmarks">
-                    Benchmarks
-                </a>
+            <a href="/pnl">
+                P/L Analytics
+            </a>
 
-                <a href="/trade_analytics">
-                    Trade Analytics
-                </a>
+            <a href="/benchmarks">
+                Benchmarks
+            </a>
 
-                <a href="/risk">
-                    Risk
-                </a>
+            <a href="/trade-analytics">
+                Trade Analytics
+            </a>
 
-                <a href="/rolling_analytics">
-                    Rolling Analytics
-                </a>
+            <a href="/risk">
+                Risk
+            </a>
 
-            </div>
+            <a href="/rolling-analytics">
+                Rolling Analytics
+            </a>
 
         </div>
 
@@ -499,7 +787,7 @@
         <footer>
 
             Bull Analytics and Trading Engine •
-            Systematic Momentum Platform
+            Professional Momentum Intelligence Platform
 
         </footer>
 
