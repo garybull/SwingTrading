@@ -259,170 +259,6 @@ def save_rankings(
 
 
 # =====================================
-# UPDATE POSITIONS
-# =====================================
-def update_positions(
-
-    conn,
-
-    leaders,
-
-    capital
-
-):
-
-    cur = conn.cursor()
-
-    clear_positions(conn)
-
-    remaining_cash = capital
-
-    inverse_vols = []
-
-    for asset in leaders:
-
-        inverse_vols.append(
-            1 / asset["volatility"]
-        )
-
-    total_inverse_vol = sum(
-        inverse_vols
-    )
-
-    today = str(
-        datetime.now().date()
-    )
-
-    for idx, asset in enumerate(leaders):
-
-        symbol = asset["symbol"]
-
-        close = asset["close"]
-
-        weight = (
-
-            inverse_vols[idx]
-            / total_inverse_vol
-
-        )
-
-        allocation_pct = (
-            weight * CASH_RESERVE
-        )
-
-        allocation_value = (
-            capital * allocation_pct
-        )
-
-        shares = int(
-            allocation_value / close
-        )
-
-        if shares <= 0:
-            continue
-
-        cost = (
-
-            shares
-            * close
-            * (1 + SLIPPAGE)
-
-        )
-
-        remaining_cash -= cost
-
-        market_value = (
-            shares * close
-        )
-
-        cur.execute("""
-
-            INSERT INTO positions (
-
-                symbol,
-                shares,
-                entry_price,
-                current_price,
-                market_value,
-                allocation_pct,
-                momentum_score,
-                volatility,
-                rebalance_date
-
-            )
-
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-
-        """, (
-
-            symbol,
-
-            shares,
-
-            close,
-
-            close,
-
-            market_value,
-
-            allocation_pct,
-
-            asset["score"],
-
-            asset["volatility"],
-
-            today
-
-        ))
-
-        cur.execute("""
-
-            INSERT INTO rebalance_log (
-
-                date,
-                symbol,
-                action,
-                shares,
-                price,
-                allocation_pct,
-                reason
-
-            )
-
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-
-        """, (
-
-            today,
-
-            symbol,
-
-            "BUY",
-
-            shares,
-
-            close,
-
-            allocation_pct,
-
-            "Top momentum ranking"
-
-        ))
-
-        logger.info(
-
-            f"BUY {symbol} | "
-            f"Shares: {shares} | "
-            f"Allocation: {allocation_pct:.2%}"
-
-        )
-
-    conn.commit()
-
-    return remaining_cash
-
-
-# =====================================
 # SAVE PORTFOLIO HISTORY
 # =====================================
 def save_portfolio_history(
@@ -763,17 +599,29 @@ def main():
 
     
     # =====================================
-    # UPDATE PORTFOLIO
+    # KEEP EXISTING CASH
     # =====================================
-    cash = update_positions(
+    cur = conn.cursor()
 
-        conn,
+    cur.execute("""
 
-        leaders,
+        SELECT current_cash
 
-        capital
+        FROM system_state
 
-    )
+        WHERE id = 1
+
+    """)
+
+    row = cur.fetchone()
+
+    if row is None:
+
+        cash = START_CAPITAL
+
+    else:
+
+        cash = float(row[0])
 
     # =====================================
     # SAVE HISTORY
