@@ -5,10 +5,20 @@ import json
 import plotly.graph_objs as go
 import plotly.utils
 import yfinance as yf
+from app.trading_cycle import (
+    run_trading_cycle
+)
+from app.dashboard_service import (
+    build_dashboard_data
+)
 from app.portfolio_state import refresh_system_state
+from app.recommendation_service import (
+    build_recommendations_page
+)
 from app.chart_engine import (
     build_recommendation_chart
 )
+
 from app.recommendation_engine import (
     build_action_plan
 )
@@ -96,372 +106,77 @@ def build_equity_chart(equity_curve):
 
 
 # =====================================
-# MAIN DASHBOARD
+# DASHBOARD
 # =====================================
 @app.route("/")
 def dashboard():
 
-    data = get_dashboard_data()
-
-    system_state = (
-        data["system_state"]
+    logger.info(
+        "Loading dashboard..."
     )
 
-    performance = (
-        data["performance"]
-    )
-
-    drawdown = (
-        data["drawdown"]
-    )
-
-    equity_curve = (
-        data["equity_curve"]
-    )
-
-    equity_chart = build_equity_chart(
-        equity_curve
-    )
-
-    pnl_summary = (
-        data["pnl_summary"]
+    dashboard_data = (
+        build_dashboard_data()
     )
 
     return render_template(
 
         "dashboard.html",
 
-        system_state=system_state,
-
-        performance=performance,
-
-        drawdown=drawdown,
-
-        equity_chart=equity_chart,
-
-        pnl_summary=pnl_summary
-
-    )
-
-
-# =====================================
-# RECOMMENDATIONS
-# =====================================
-@app.route("/recommendations")
-def recommendations():
-
-    logger.info(
-        "Loading recommendations page..."
-    )
-
-    conn = get_connection()
-
-    # =====================================
-    # RECOMMENDED PORTFOLIO
-    # =====================================
-    recommended_portfolio = pd.read_sql_query(
-
-        """
-
-        SELECT *
-
-        FROM recommended_portfolio
-
-        ORDER BY score DESC
-
-        """,
-
-        conn
-
-    )
-
-    # =====================================
-    # CURRENT POSITIONS
-    # =====================================
-    positions = pd.read_sql_query(
-
-        """
-
-        SELECT *
-
-        FROM positions
-
-        ORDER BY market_value DESC
-
-        """,
-
-        conn
-
-    )
-
-    # =====================================
-    # MOMENTUM RANKINGS
-    # =====================================
-    momentum_rankings = pd.read_sql_query(
-
-        """
-
-        SELECT *
-
-        FROM rankings
-
-        ORDER BY rank ASC
-
-        LIMIT 25
-
-        """,
-
-        conn
-
-    )
-
-    conn.close()
-
-    # =====================================
-    # GET EQUITY
-    # =====================================
-    refresh_system_state()
-
-    dashboard_data = get_dashboard_data()
-
-    equity = float(
-
-        dashboard_data["system_state"]
-        ["starting_capital"]
-
-    )
-
-    # =====================================
-    # ENRICH RECOMMENDATIONS
-    # =====================================
-    if not recommended_portfolio.empty:
-        print("EQUITY:", equity)
-        for idx, row in recommended_portfolio.iterrows():
-
-            symbol = row["symbol"]
-
-            try:
-
-                ticker = yf.Ticker(symbol)
-
-                hist = ticker.history(period="1d")
-
-                if not hist.empty:
-
-                    current_price = float(
-
-                        hist["Close"].iloc[-1]
-
-                    )
-
-                else:
-
-                    current_price = 0
-
-            except Exception as e:
-
-                logger.error(
-                    f"Price fetch failed "
-                    f"for {symbol}: {e}"
-                )
-
-                current_price = 0
-
-            target_allocation = float(
-                row["target_allocation"]
-            )
-
-            position_size = (
-                equity * target_allocation
-            )
-
-            if current_price > 0:
-
-                shares = int(
-
-                    position_size
-                    / current_price
-
-                )
-
-            else:
-
-                shares = 0
-
-            recommended_portfolio.loc[
-                idx,
-                "current_price"
-            ] = round(
-                current_price,
-                2
-            )
-
-            recommended_portfolio.loc[
-                idx,
-                "position_size"
-            ] = round(
-                position_size,
-                2
-            )
-
-            recommended_portfolio.loc[
-                idx,
-                "recommended_shares"
-            ] = shares
-
-    # =====================================
-    # BUILD ACTION PLAN
-    # =====================================
-    actions = build_action_plan(
-
-        recommended_portfolio,
-
-        positions
-
-    )
-
-    # =====================================
-    # BUILD CHARTS
-    # =====================================
-    for action in actions:
-
-        try:
-
-            chart_json = build_chart(
-
-                action["symbol"],
-
-                stop=action.get("stop"),
-
-                target=action.get("target_1")
-
-            )
-
-            action["chart"] = chart_json
-
-        except Exception as e:
-
-            logger.error(
-
-                f"Chart failed for "
-                f"{action['symbol']}: {e}"
-
-            )
-
-            action["chart"] = {}
-
-    logger.info(
-        "Recommendations page loaded"
-    )
-
-    return render_template(
-
-        "recommendations.html",
-
-        recommended_portfolio=
-            recommended_portfolio
-            .to_dict(
-                orient="records"
-            ),
-
-        positions=
-            positions
-            .to_dict(
-                orient="records"
-            ),
-
-        momentum_rankings=
-            momentum_rankings
-            .to_dict(
-                orient="records"
-            ),
-
-        actions=actions
-
-    )
-
-# =====================================
-# PNL
-# =====================================
-
-@app.route("/pnl")
-def pnl():
-
-    data = get_dashboard_data()
-
-    pnl_summary = data[
-        "pnl_summary"
-    ]
-
-    return render_template(
-
-        "pnl.html",
-
-        unrealized_positions=(
-            pnl_summary[
-                "unrealized_positions"
-            ].to_dict(
-                orient="records"
-            )
-        ),
-
-        realized_trades=(
-            pnl_summary[
-                "realized_trades"
-            ].to_dict(
-                orient="records"
-            )
-        ),
-
-        total_unrealized=(
-            pnl_summary[
-                "total_unrealized"
+        positions=dashboard_data[
+            "positions"
+        ],
+
+        equity=dashboard_data[
+            "equity"
+        ],
+
+        cash=dashboard_data[
+            "cash"
+        ],
+
+        total_equity=dashboard_data[
+            "total_equity"
+        ],
+
+        total_return_pct=
+            dashboard_data[
+                "total_return_pct"
+            ],
+
+        system_state=
+            dashboard_data[
+                "system_state"
+            ],
+
+        recent_rebalances=
+            dashboard_data[
+                "recent_rebalances"
             ]
-        ),
-
-        total_realized=(
-            pnl_summary[
-                "total_realized"
-            ]
-        )
 
     )
+
+
 # =====================================
 # RUN SCAN
 # =====================================
 @app.route(
-
     "/run_scan",
-
     methods=["POST"]
-
 )
-def run_scan():
+def run_scan_route():
 
     logger.info(
-        "🚀 Manual scan triggered"
+        "Running trading cycle..."
     )
 
-    try:
-
-        run_rebalance()
-
-        logger.info(
-            "✅ Manual scan complete"
-        )
-
-    except Exception as e:
-
-        logger.error(
-
-            f"❌ Manual scan failed: {e}"
-
-        )
+    run_trading_cycle()
 
     return redirect(
-        url_for("recommendations")
+        url_for(
+            "recommendations"
+        )
     )
-
 
 # =====================================
 # BENCHMARKS

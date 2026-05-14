@@ -120,6 +120,8 @@ def init_db():
 
         score REAL,
 
+        close REAL,
+
         mom_1m REAL,
 
         mom_3m REAL,
@@ -152,6 +154,12 @@ def init_db():
         score REAL,
 
         action TEXT,
+
+        current_price REAL,
+
+        target_value REAL,
+
+        recommended_shares INTEGER,
 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 

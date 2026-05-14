@@ -1,29 +1,36 @@
 # app/position_monitor.py
 
 import time
-import sqlite3
 import pandas as pd
-import yfinance as yf
 from datetime import datetime
 
 from app.logger import logger
-from app.emailer import send_email
 
+from app.emailer import (
+    send_email
+)
 
-DB_PATH = "/home/ubuntu/SwingTrading/trading_system.db"
+from app.db_service import (
+    query_df,
+    execute
+)
+
+from app.market_data_service import (
+    get_live_price,
+    get_historical_data
+)
 
 
 # =====================================
-# CREATE ALERT TABLE
+# INITIALIZE ALERT TABLE
 # =====================================
 def initialize_alert_table():
 
-    conn = sqlite3.connect(DB_PATH)
+    logger.info(
+        "Initializing alerts table..."
+    )
 
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
+    execute("""
 
         CREATE TABLE IF NOT EXISTS alerts_sent (
 
@@ -41,12 +48,11 @@ def initialize_alert_table():
 
         )
 
-        """
+    """)
+
+    logger.info(
+        "Alerts table ready"
     )
-
-    conn.commit()
-
-    conn.close()
 
 
 # =====================================
@@ -54,11 +60,14 @@ def initialize_alert_table():
 # =====================================
 def get_positions():
 
-    conn = sqlite3.connect(DB_PATH)
+    logger.info(
+        "Loading active positions..."
+    )
 
-    query = """
+    positions = query_df("""
 
         SELECT
+
             symbol,
             shares,
             entry_price
@@ -67,90 +76,45 @@ def get_positions():
 
         WHERE shares > 0
 
-    """
+    """)
 
-    df = pd.read_sql_query(
-        query,
-        conn
+    logger.info(
+
+        f"Loaded "
+        f"{len(positions)} positions"
+
     )
 
-    conn.close()
-
-    return df
+    return positions
 
 
 # =====================================
-# GET CURRENT PRICE
-# =====================================
-def get_current_price(symbol):
-
-    try:
-
-        ticker = yf.Ticker(symbol)
-
-        price = (
-
-            ticker.fast_info
-
-            .get("lastPrice")
-
-        )
-
-        if price is None:
-
-            hist = ticker.history(
-                period="1d",
-                interval="1m"
-            )
-
-            if hist.empty:
-
-                return None
-
-            price = hist["Close"].iloc[-1]
-
-        return float(price)
-
-    except Exception as e:
-
-        logger.error(
-            f"Price fetch failed for {symbol}: {e}"
-        )
-
-        return None
-
-
-# =====================================
-# CALCULATE LEVELS
+# CALCULATE ATR LEVELS
 # =====================================
 def calculate_levels(
+
     symbol,
     entry_price
+
 ):
 
     try:
 
-        df = yf.download(
-
-            symbol,
-
-            period="30d",
-
-            interval="1d",
-
-            auto_adjust=False,
-
-            progress=False
-
+        df = get_historical_data(
+            symbol
         )
 
-        if df.empty:
+        if df is None:
 
             return None
 
-        # ==============================
+        if len(df) < 20:
+
+            return None
+
+        # =====================================
         # TRUE RANGE
-        # ==============================
+        # =====================================
         high_low = (
 
             df["High"]
@@ -190,9 +154,9 @@ def calculate_levels(
             axis=1
         )
 
-        # ==============================
+        # =====================================
         # ATR
-        # ==============================
+        # =====================================
         atr = (
 
             true_range
@@ -207,11 +171,9 @@ def calculate_levels(
 
         atr = float(atr)
 
-        # ==============================
-        # FIXED LEVELS
-        # BASED ON ENTRY
-        # ==============================
-        
+        # =====================================
+        # STOP / TARGET
+        # =====================================
         stop_price = round(
 
             entry_price
@@ -232,40 +194,43 @@ def calculate_levels(
 
         return {
 
-            "stop": stop_price,
+            "stop":
+                stop_price,
 
-            "target": target_price
+            "target":
+                target_price
 
         }
 
     except Exception as e:
 
         logger.error(
-            f"Level calculation failed for {symbol}: {e}"
+
+            f"Level calculation failed "
+            f"for {symbol}: {e}"
+
         )
 
         return None
+
 
 # =====================================
 # CHECK DUPLICATE ALERT
 # =====================================
 def alert_already_sent(
+
     symbol,
     alert_type
+
 ):
-
-    conn = sqlite3.connect(DB_PATH)
-
-    cursor = conn.cursor()
 
     today = datetime.now().strftime(
         "%Y-%m-%d"
     )
 
-    cursor.execute(
-        """
+    df = query_df("""
 
-        SELECT COUNT(*)
+        SELECT *
 
         FROM alerts_sent
 
@@ -273,42 +238,33 @@ def alert_already_sent(
         AND alert_type = ?
         AND alert_date = ?
 
-        """,
+    """, (
 
-        (
-            symbol,
-            alert_type,
-            today
-        )
+        symbol,
+        alert_type,
+        today
 
-    )
+    ))
 
-    count = cursor.fetchone()[0]
-
-    conn.close()
-
-    return count > 0
+    return not df.empty
 
 
 # =====================================
 # RECORD ALERT
 # =====================================
 def record_alert(
+
     symbol,
     alert_type,
     price
+
 ):
-
-    conn = sqlite3.connect(DB_PATH)
-
-    cursor = conn.cursor()
 
     today = datetime.now().strftime(
         "%Y-%m-%d"
     )
 
-    cursor.execute(
-        """
+    execute("""
 
         INSERT INTO alerts_sent (
 
@@ -321,30 +277,33 @@ def record_alert(
 
         VALUES (?, ?, ?, ?)
 
-        """,
+    """, (
 
-        (
-            symbol,
-            alert_type,
-            price,
-            today
-        )
+        symbol,
+        alert_type,
+        price,
+        today
+
+    ))
+
+    logger.info(
+
+        f"Recorded alert for "
+        f"{symbol}"
 
     )
-
-    conn.commit()
-
-    conn.close()
 
 
 # =====================================
 # SEND ALERT EMAIL
 # =====================================
 def send_alert_email(
+
     symbol,
     alert_type,
     current_price,
     trigger_price
+
 ):
 
     subject = (
@@ -353,22 +312,22 @@ def send_alert_email(
 
     body = f"""
 
-    ALERT TYPE:
-    {alert_type}
+ALERT TYPE:
+{alert_type}
 
-    SYMBOL:
-    {symbol}
+SYMBOL:
+{symbol}
 
-    CURRENT PRICE:
-    ${round(current_price,2)}
+CURRENT PRICE:
+${round(current_price, 2)}
 
-    TRIGGER LEVEL:
-    ${round(trigger_price,2)}
+TRIGGER LEVEL:
+${round(trigger_price, 2)}
 
-    TIME:
-    {datetime.now()}
+TIME:
+{datetime.now()}
 
-    """
+"""
 
     send_email(
         subject,
@@ -381,7 +340,7 @@ def send_alert_email(
 
 
 # =====================================
-# CHECK POSITIONS
+# MONITOR POSITIONS
 # =====================================
 def monitor_positions():
 
@@ -391,6 +350,9 @@ def monitor_positions():
 
     positions = get_positions()
 
+    # =====================================
+    # EMPTY SAFETY
+    # =====================================
     if positions.empty:
 
         logger.info(
@@ -399,6 +361,9 @@ def monitor_positions():
 
         return
 
+    # =====================================
+    # POSITION LOOP
+    # =====================================
     for _, row in positions.iterrows():
 
         symbol = row["symbol"]
@@ -407,11 +372,18 @@ def monitor_positions():
             f"Checking {symbol}"
         )
 
-        current_price = get_current_price(
-            symbol
+        current_price = (
+            get_live_price(symbol)
         )
 
-        if current_price is None:
+        if current_price <= 0:
+
+            logger.warning(
+
+                f"No live price for "
+                f"{symbol}"
+
+            )
 
             continue
 
@@ -435,9 +407,9 @@ def monitor_positions():
 
         target_price = levels["target"]
 
-        # ==============================
+        # =====================================
         # STOP ALERT
-        # ==============================
+        # =====================================
         if current_price <= stop_price:
 
             if not alert_already_sent(
@@ -470,9 +442,9 @@ def monitor_positions():
 
                 )
 
-        # ==============================
+        # =====================================
         # TARGET ALERT
-        # ==============================
+        # =====================================
         if current_price >= target_price:
 
             if not alert_already_sent(
@@ -530,7 +502,10 @@ if __name__ == "__main__":
         except Exception as e:
 
             logger.error(
-                f"Monitor loop failed: {e}"
+
+                f"Monitor loop failed: "
+                f"{e}"
+
             )
 
         logger.info(

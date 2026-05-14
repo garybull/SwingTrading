@@ -1,22 +1,17 @@
 # app/reconciliation.py
 
-import sqlite3
 import pandas as pd
 
 from app.config import (
-    DB_NAME,
     START_CAPITAL
 )
 
 from app.logger import logger
 
-
-# =====================================
-# DB CONNECTION
-# =====================================
-def get_connection():
-
-    return sqlite3.connect(DB_NAME)
+from app.db_service import (
+    query_df,
+    execute
+)
 
 
 # =====================================
@@ -25,14 +20,13 @@ def get_connection():
 def rebuild_positions_from_trades():
 
     logger.info(
-        "🔧 Starting reconciliation..."
+        "Starting reconciliation..."
     )
 
-    conn = get_connection()
-
-    trades = pd.read_sql_query(
-
-        """
+    # =====================================
+    # LOAD TRADES
+    # =====================================
+    trades = query_df("""
 
         SELECT *
 
@@ -40,11 +34,24 @@ def rebuild_positions_from_trades():
 
         ORDER BY date ASC, id ASC
 
-        """,
+    """)
 
-        conn
+    # =====================================
+    # EMPTY SAFETY
+    # =====================================
+    if trades.empty:
 
-    )
+        logger.warning(
+            "No executed trades found"
+        )
+
+        return {
+
+            "positions": {},
+
+            "cash": START_CAPITAL
+
+        }
 
     positions = {}
 
@@ -71,6 +78,9 @@ def rebuild_positions_from_trades():
             shares * fill_price
         )
 
+        # =====================================
+        # INIT POSITION
+        # =====================================
         if symbol not in positions:
 
             positions[symbol] = {
@@ -98,6 +108,9 @@ def rebuild_positions_from_trades():
                 current_shares + shares
             )
 
+            # =====================================
+            # WEIGHTED AVERAGE
+            # =====================================
             if new_shares > 0:
 
                 new_avg = (
@@ -144,9 +157,7 @@ def rebuild_positions_from_trades():
     # =====================================
     # CLEAR POSITIONS TABLE
     # =====================================
-    cur = conn.cursor()
-
-    cur.execute("""
+    execute("""
 
         DELETE FROM positions
 
@@ -157,10 +168,17 @@ def rebuild_positions_from_trades():
     # =====================================
     for symbol, pos in positions.items():
 
-        shares = pos["shares"]
+        shares = int(
+            pos["shares"]
+        )
 
-        avg_price = pos["avg_price"]
+        avg_price = float(
+            pos["avg_price"]
+        )
 
+        # =====================================
+        # SKIP CLOSED POSITIONS
+        # =====================================
         if shares <= 0:
 
             continue
@@ -169,7 +187,7 @@ def rebuild_positions_from_trades():
             shares * avg_price
         )
 
-        cur.execute("""
+        execute("""
 
             INSERT INTO positions (
 
@@ -212,7 +230,7 @@ def rebuild_positions_from_trades():
     # =====================================
     # UPDATE CASH
     # =====================================
-    cur.execute("""
+    execute("""
 
         UPDATE system_state
 
@@ -226,14 +244,30 @@ def rebuild_positions_from_trades():
 
     ))
 
-    conn.commit()
-
-    conn.close()
-
     logger.info(
-        "✅ Reconciliation complete"
+        "Reconciliation complete"
     )
 
     logger.info(
-        f"Cash: ${cash:,.2f}"
+
+        f"Cash rebuilt to "
+        f"${cash:,.2f}"
+
     )
+
+    logger.info(
+
+        f"Open positions rebuilt: "
+        f"{len(positions)}"
+
+    )
+
+    return {
+
+        "positions":
+            positions,
+
+        "cash":
+            cash
+
+    }

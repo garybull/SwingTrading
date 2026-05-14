@@ -3,12 +3,15 @@
 import json
 
 import pandas as pd
-import yfinance as yf
 
 import plotly
 import plotly.graph_objects as go
 
 from app.logger import logger
+
+from app.market_data_service import (
+    get_historical_data
+)
 
 
 # =====================================
@@ -69,44 +72,36 @@ def build_recommendation_chart(
     )
 
     # =====================================
-    # DOWNLOAD DATA
+    # LOAD MARKET DATA
     # =====================================
-    df = yf.download(
-
-        symbol,
-
-        period="14d",
-
-        interval="1h",
-
-        auto_adjust=True,
-
-        progress=False,
-
-        threads=False
-
+    df = get_historical_data(
+        symbol
     )
+
+    # =====================================
+    # EMPTY SAFETY
+    # =====================================
+    if df is None:
+
+        logger.warning(
+
+            f"No chart data for "
+            f"{symbol}"
+
+        )
+
+        return {}
 
     if df.empty:
 
         return {}
 
-    df = df.dropna()
+    df = df.dropna().copy()
 
     # =====================================
-    # REGULAR MARKET HOURS ONLY
+    # LIMIT RECENT DATA
     # =====================================
-    df = df.between_time(
-
-        "09:30",
-
-        "16:00"
-
-    )
-
-    if df.empty:
-
-        return {}
+    df = df.tail(120)
 
     # =====================================
     # EMA20
@@ -150,6 +145,13 @@ def build_recommendation_chart(
         .iloc[-1]
 
     )
+
+    # =====================================
+    # SAFETY
+    # =====================================
+    if atr <= 0:
+
+        atr = current_price * 0.03
 
     stop_price = round(
 
@@ -255,6 +257,7 @@ def build_recommendation_chart(
         )
 
     )
+
     # =====================================
     # EMA20
     # =====================================
@@ -287,7 +290,10 @@ def build_recommendation_chart(
         y=current_price,
 
         annotation_text=(
-            f"ENTRY ${round(current_price,2)}"
+
+            f"ENTRY "
+            f"${round(current_price, 2)}"
+
         )
 
     )
@@ -303,6 +309,33 @@ def build_recommendation_chart(
 
         annotation_text=(
             f"STOP ${stop_price}"
+        )
+
+    )
+
+    # =====================================
+    # TARGET LINES
+    # =====================================
+    fig.add_hline(
+
+        y=target_1,
+
+        line_dash="dot",
+
+        annotation_text=(
+            f"TARGET 1 ${target_1}"
+        )
+
+    )
+
+    fig.add_hline(
+
+        y=target_2,
+
+        line_dash="dot",
+
+        annotation_text=(
+            f"TARGET 2 ${target_2}"
         )
 
     )
@@ -335,7 +368,7 @@ def build_recommendation_chart(
     fig.update_layout(
 
         title=(
-            f"{symbol} Hourly Setup"
+            f"{symbol} Setup"
         ),
 
         template="plotly_dark",
@@ -364,25 +397,34 @@ def build_recommendation_chart(
 
     return {
 
-        "symbol": symbol,
+        "symbol":
+            symbol,
 
-        "chart": chart_json,
+        "chart":
+            chart_json,
 
-        "entry": round(
-            current_price,
-            2
-        ),
+        "entry":
+            round(
+                current_price,
+                2
+            ),
 
-        "stop": stop_price,
+        "stop":
+            stop_price,
 
-        "target_1": target_1,
+        "target_1":
+            target_1,
 
-        "target_2": target_2,
+        "target_2":
+            target_2,
 
-        "risk_pct": risk_pct,
+        "risk_pct":
+            risk_pct,
 
-        "reward_pct": reward_pct,
+        "reward_pct":
+            reward_pct,
 
-        "rr_ratio": rr_ratio
+        "rr_ratio":
+            rr_ratio
 
     }

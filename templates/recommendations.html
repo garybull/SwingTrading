@@ -506,8 +506,9 @@ ACTION PLAN + CHARTS
 
 <script>
 
-    let chart_{{ c.symbol }} =
-    { { c.chart | safe } };
+    let chart_{{ c.symbol }} = JSON.parse(
+            '{{ c.chart | safe }}'
+        );
 
     Plotly.newPlot(
 
@@ -518,13 +519,8 @@ ACTION PLAN + CHARTS
         chart_{{ c.symbol }}.layout,
 
         {
-
             responsive: true,
-
-            scrollZoom: true,
-
-            displayModeBar: true
-
+            scrollZoom: true
         }
 
     );

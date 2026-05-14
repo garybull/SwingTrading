@@ -2,13 +2,16 @@
 
 import pandas as pd
 import numpy as np
-import yfinance as yf
 
 from app.portfolio import (
     get_equity_curve
 )
 
 from app.logger import logger
+
+from app.market_data_service import (
+    get_historical_data
+)
 
 
 # =====================================
@@ -130,13 +133,28 @@ def calculate_sortino(
 # =====================================
 def get_system_curve():
 
+    logger.info(
+        "Building system curve..."
+    )
+
     equity_curve = (
         get_equity_curve()
     )
 
+    # =====================================
+    # EMPTY SAFETY
+    # =====================================
     if equity_curve.empty:
 
+        logger.warning(
+            "No equity curve found"
+        )
+
         return pd.DataFrame()
+
+    equity_curve = (
+        equity_curve.copy()
+    )
 
     equity_curve["date"] = pd.to_datetime(
 
@@ -148,52 +166,109 @@ def get_system_curve():
         "date"
     )
 
+    starting_equity = float(
+
+        equity_curve.iloc[0][
+            "equity"
+        ]
+
+    )
+
+    # =====================================
+    # SAFETY
+    # =====================================
+    if starting_equity <= 0:
+
+        logger.warning(
+            "Invalid starting equity"
+        )
+
+        return pd.DataFrame()
+
     equity_curve["normalized"] = (
 
         equity_curve["equity"]
 
-        / equity_curve.iloc[0]["equity"]
+        / starting_equity
 
     ) * STARTING_CAPITAL
+
+    logger.info(
+        "System curve built"
+    )
 
     return equity_curve
 
 
 # =====================================
-# DOWNLOAD BENCHMARKS
+# BUILD BENCHMARK CURVES
 # =====================================
 def get_benchmark_curves():
 
     logger.info(
-        "Downloading benchmarks..."
+        "Building benchmark curves..."
     )
-
-    data = yf.download(
-
-        BENCHMARKS,
-
-        start="2010-01-01",
-
-        auto_adjust=True,
-
-        progress=False
-
-    )
-
-    close = data["Close"]
 
     benchmark_curves = {}
 
+    # =====================================
+    # SYMBOL LOOP
+    # =====================================
     for symbol in BENCHMARKS:
 
-        series = close[
+        logger.info(
+            f"Loading {symbol}"
+        )
+
+        df = get_historical_data(
             symbol
-        ].dropna()
+        )
+
+        # =====================================
+        # EMPTY SAFETY
+        # =====================================
+        if df is None:
+
+            logger.warning(
+
+                f"No benchmark data "
+                f"for {symbol}"
+
+            )
+
+            continue
+
+        if df.empty:
+
+            continue
+
+        # =====================================
+        # CLOSE SERIES
+        # =====================================
+        close = (
+            df["Close"]
+            .dropna()
+        )
+
+        if len(close) == 0:
+
+            continue
+
+        starting_price = float(
+            close.iloc[0]
+        )
+
+        # =====================================
+        # SAFETY
+        # =====================================
+        if starting_price <= 0:
+
+            continue
 
         normalized = (
 
-            series
-            / series.iloc[0]
+            close
+            / starting_price
 
         ) * STARTING_CAPITAL
 
@@ -202,7 +277,7 @@ def get_benchmark_curves():
         ] = normalized
 
     logger.info(
-        "Benchmarks downloaded"
+        "Benchmark curves built"
     )
 
     return benchmark_curves
@@ -215,10 +290,25 @@ def calculate_metrics(
     equity_series
 ):
 
+    # =====================================
+    # EMPTY SAFETY
+    # =====================================
+    if equity_series is None:
+
+        return {}
+
+    if len(equity_series) < 2:
+
+        return {}
+
     returns = (
+
         equity_series
+
         .pct_change()
+
         .dropna()
+
     )
 
     starting = float(
@@ -310,22 +400,24 @@ def get_benchmark_report():
     report = {}
 
     # =====================================
-    # SYSTEM
+    # SYSTEM METRICS
     # =====================================
-    report["SYSTEM"] = (
+    if not system_curve.empty:
 
-        calculate_metrics(
+        report["SYSTEM"] = (
 
-            system_curve[
-                "normalized"
-            ]
+            calculate_metrics(
+
+                system_curve[
+                    "normalized"
+                ]
+
+            )
 
         )
 
-    )
-
     # =====================================
-    # BENCHMARKS
+    # BENCHMARK METRICS
     # =====================================
     for symbol, curve in benchmark_curves.items():
 
@@ -343,7 +435,8 @@ def get_benchmark_report():
 
     return {
 
-        "report": report,
+        "report":
+            report,
 
         "system_curve":
             system_curve,

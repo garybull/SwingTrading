@@ -1,19 +1,12 @@
 # app/trade_analytics.py
 
-import sqlite3
 import pandas as pd
-
-from app.config import DB_NAME
 
 from app.logger import logger
 
-
-# =====================================
-# DB CONNECTION
-# =====================================
-def get_connection():
-
-    return sqlite3.connect(DB_NAME)
+from app.db_service import (
+    query_df
+)
 
 
 # =====================================
@@ -21,11 +14,11 @@ def get_connection():
 # =====================================
 def load_trades():
 
-    conn = get_connection()
+    logger.info(
+        "Loading executed trades..."
+    )
 
-    trades = pd.read_sql_query(
-
-        """
+    trades = query_df("""
 
         SELECT *
 
@@ -33,13 +26,14 @@ def load_trades():
 
         ORDER BY date ASC, id ASC
 
-        """,
+    """)
 
-        conn
+    logger.info(
+
+        f"Loaded "
+        f"{len(trades)} trades"
 
     )
-
-    conn.close()
 
     return trades
 
@@ -50,10 +44,17 @@ def load_trades():
 # =====================================
 def build_closed_trades(trades):
 
+    logger.info(
+        "Building closed trades..."
+    )
+
     inventory = {}
 
     closed = []
 
+    # =====================================
+    # PROCESS TRADES
+    # =====================================
     for _, trade in trades.iterrows():
 
         symbol = trade["symbol"]
@@ -81,11 +82,14 @@ def build_closed_trades(trades):
 
             inventory[symbol].append({
 
-                "shares": shares,
+                "shares":
+                    shares,
 
-                "price": fill_price,
+                "price":
+                    fill_price,
 
-                "date": trade_date
+                "date":
+                    trade_date
 
             })
 
@@ -127,7 +131,8 @@ def build_closed_trades(trades):
 
                 closed.append({
 
-                    "symbol": symbol,
+                    "symbol":
+                        symbol,
 
                     "entry_price":
                         lot["price"],
@@ -144,7 +149,8 @@ def build_closed_trades(trades):
                     "exit_date":
                         trade_date,
 
-                    "pnl": pnl
+                    "pnl":
+                        pnl
 
                 })
 
@@ -152,13 +158,54 @@ def build_closed_trades(trades):
 
                 remaining -= matched
 
+                # =====================================
+                # REMOVE EMPTY LOT
+                # =====================================
                 if lot["shares"] <= 0:
 
                     inventory[
                         symbol
                     ].pop(0)
 
-    return pd.DataFrame(closed)
+    closed_df = pd.DataFrame(
+        closed
+    )
+
+    logger.info(
+
+        f"Built "
+        f"{len(closed_df)} "
+        f"closed trades"
+
+    )
+
+    return closed_df
+
+
+# =====================================
+# EMPTY ANALYTICS RESPONSE
+# =====================================
+def empty_analytics():
+
+    return {
+
+        "win_rate": 0,
+
+        "profit_factor": 0,
+
+        "expectancy": 0,
+
+        "avg_win": 0,
+
+        "avg_loss": 0,
+
+        "largest_win": 0,
+
+        "largest_loss": 0,
+
+        "symbol_stats": []
+
+    }
 
 
 # =====================================
@@ -172,27 +219,16 @@ def get_trade_analytics():
 
     trades = load_trades()
 
+    # =====================================
+    # EMPTY SAFETY
+    # =====================================
     if trades.empty:
 
-        return {
+        logger.warning(
+            "No executed trades found"
+        )
 
-            "win_rate": 0,
-
-            "profit_factor": 0,
-
-            "expectancy": 0,
-
-            "avg_win": 0,
-
-            "avg_loss": 0,
-
-            "largest_win": 0,
-
-            "largest_loss": 0,
-
-            "symbol_stats": []
-
-        }
+        return empty_analytics()
 
     closed = build_closed_trades(
         trades
@@ -200,25 +236,11 @@ def get_trade_analytics():
 
     if closed.empty:
 
-        return {
+        logger.warning(
+            "No closed trades built"
+        )
 
-            "win_rate": 0,
-
-            "profit_factor": 0,
-
-            "expectancy": 0,
-
-            "avg_win": 0,
-
-            "avg_loss": 0,
-
-            "largest_win": 0,
-
-            "largest_loss": 0,
-
-            "symbol_stats": []
-
-        }
+        return empty_analytics()
 
     # =====================================
     # WINNERS / LOSERS
@@ -301,25 +323,31 @@ def get_trade_analytics():
     # =====================================
     # EXPECTANCY
     # =====================================
-    win_prob = (
-        total_wins
-        / total_trades
-    )
+    if total_trades > 0:
 
-    loss_prob = (
-        total_losses
-        / total_trades
-    )
+        win_prob = (
+            total_wins
+            / total_trades
+        )
 
-    expectancy = (
+        loss_prob = (
+            total_losses
+            / total_trades
+        )
 
-        (win_prob * avg_win)
+        expectancy = (
 
-        +
+            (win_prob * avg_win)
 
-        (loss_prob * avg_loss)
+            +
 
-    )
+            (loss_prob * avg_loss)
+
+        )
+
+    else:
+
+        expectancy = 0
 
     # =====================================
     # EXTREMES

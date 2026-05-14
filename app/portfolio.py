@@ -1,34 +1,26 @@
 # app/portfolio.py
 
-import sqlite3
 import pandas as pd
-
-from app.config import DB_NAME
 
 from app.live_portfolio import (
     get_live_portfolio
 )
 
 from app.logger import logger
+
 from app.pnl_engine import (
     get_pnl_summary
 )
 
-
-# =====================================
-# DB CONNECTION
-# =====================================
-def get_connection():
-
-    return sqlite3.connect(DB_NAME)
+from app.db_service import (
+    query_df
+)
 
 
 # =====================================
 # SYSTEM STATE
 # =====================================
 def get_system_state():
-
-    conn = get_connection()
 
     query = """
 
@@ -40,12 +32,7 @@ def get_system_state():
 
     """
 
-    df = pd.read_sql_query(
-        query,
-        conn
-    )
-
-    conn.close()
+    df = query_df(query)
 
     if df.empty:
 
@@ -73,8 +60,6 @@ def get_system_state():
 # =====================================
 def get_rankings(limit=25):
 
-    conn = get_connection()
-
     query = f"""
 
         SELECT *
@@ -87,22 +72,13 @@ def get_rankings(limit=25):
 
     """
 
-    df = pd.read_sql_query(
-        query,
-        conn
-    )
-
-    conn.close()
-
-    return df
+    return query_df(query)
 
 
 # =====================================
 # REBALANCE HISTORY
 # =====================================
 def get_rebalance_history(limit=100):
-
-    conn = get_connection()
 
     query = f"""
 
@@ -116,22 +92,13 @@ def get_rebalance_history(limit=100):
 
     """
 
-    df = pd.read_sql_query(
-        query,
-        conn
-    )
-
-    conn.close()
-
-    return df
+    return query_df(query)
 
 
 # =====================================
 # EXECUTED TRADES
 # =====================================
 def get_executed_trades(limit=100):
-
-    conn = get_connection()
 
     query = f"""
 
@@ -154,22 +121,13 @@ def get_executed_trades(limit=100):
 
     """
 
-    df = pd.read_sql_query(
-        query,
-        conn
-    )
-
-    conn.close()
-
-    return df
+    return query_df(query)
 
 
 # =====================================
 # RECOMMENDED PORTFOLIO
 # =====================================
 def get_recommended_portfolio():
-
-    conn = get_connection()
 
     query = """
 
@@ -178,7 +136,10 @@ def get_recommended_portfolio():
             symbol,
             target_allocation,
             score,
-            action
+            action,
+            current_price,
+            target_value,
+            recommended_shares
 
         FROM recommended_portfolio
 
@@ -186,22 +147,13 @@ def get_recommended_portfolio():
 
     """
 
-    df = pd.read_sql_query(
-        query,
-        conn
-    )
-
-    conn.close()
-
-    return df
+    return query_df(query)
 
 
 # =====================================
 # EQUITY CURVE
 # =====================================
 def get_equity_curve():
-
-    conn = get_connection()
 
     query = """
 
@@ -216,14 +168,7 @@ def get_equity_curve():
 
     """
 
-    df = pd.read_sql_query(
-        query,
-        conn
-    )
-
-    conn.close()
-
-    return df
+    return query_df(query)
 
 
 # =====================================
@@ -375,6 +320,7 @@ def get_current_drawdown(equity_curve):
         abs(drawdown),
         2
     )
+
 
 # =====================================
 # DASHBOARD DATA

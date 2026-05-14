@@ -1,9 +1,6 @@
 # app/pnl_engine.py
 
-import sqlite3
 import pandas as pd
-
-from app.config import DB_NAME
 
 from app.live_portfolio import (
     get_live_portfolio
@@ -11,19 +8,19 @@ from app.live_portfolio import (
 
 from app.logger import logger
 
-
-# =====================================
-# DB CONNECTION
-# =====================================
-def get_connection():
-
-    return sqlite3.connect(DB_NAME)
+from app.db_service import (
+    query_df
+)
 
 
 # =====================================
 # UNREALIZED PNL
 # =====================================
 def calculate_unrealized_pnl():
+
+    logger.info(
+        "Calculating unrealized PnL..."
+    )
 
     live_portfolio = (
         get_live_portfolio()
@@ -33,24 +30,47 @@ def calculate_unrealized_pnl():
         "positions"
     ]
 
+    # =====================================
+    # EMPTY SAFETY
+    # =====================================
+    if positions.empty:
+
+        return {
+
+            "positions":
+                pd.DataFrame(),
+
+            "total_unrealized":
+                0
+
+        }
+
     pnl_rows = []
 
     total_unrealized = 0
 
+    # =====================================
+    # POSITION LOOP
+    # =====================================
     for _, row in positions.iterrows():
 
         symbol = row["symbol"]
 
-        shares = row["shares"]
+        shares = float(
+            row["shares"]
+        )
 
-        entry_price = row[
-            "entry_price"
-        ]
+        entry_price = float(
+            row["entry_price"]
+        )
 
-        current_price = row[
-            "current_price"
-        ]
+        current_price = float(
+            row["current_price"]
+        )
 
+        # =====================================
+        # PNL
+        # =====================================
         unrealized = (
 
             current_price
@@ -58,14 +78,23 @@ def calculate_unrealized_pnl():
 
         ) * shares
 
-        unrealized_pct = (
+        # =====================================
+        # PNL %
+        # =====================================
+        if entry_price > 0:
 
-            (
-                current_price
-                / entry_price
-            ) - 1
+            unrealized_pct = (
 
-        ) * 100
+                (
+                    current_price
+                    / entry_price
+                ) - 1
+
+            ) * 100
+
+        else:
+
+            unrealized_pct = 0
 
         total_unrealized += (
             unrealized
@@ -73,28 +102,42 @@ def calculate_unrealized_pnl():
 
         pnl_rows.append({
 
-            "symbol": symbol,
+            "symbol":
+                symbol,
 
-            "shares": shares,
+            "shares":
+                shares,
 
-            "entry_price": entry_price,
+            "entry_price":
+                entry_price,
 
-            "current_price": current_price,
+            "current_price":
+                current_price,
 
-            "unrealized_pnl": unrealized,
+            "unrealized_pnl":
+                unrealized,
 
             "unrealized_pct":
                 unrealized_pct
 
         })
 
-    df = pd.DataFrame(
+    pnl_df = pd.DataFrame(
         pnl_rows
+    )
+
+    logger.info(
+
+        f"Calculated unrealized "
+        f"PnL for "
+        f"{len(pnl_df)} positions"
+
     )
 
     return {
 
-        "positions": df,
+        "positions":
+            pnl_df,
 
         "total_unrealized":
             total_unrealized
@@ -107,11 +150,11 @@ def calculate_unrealized_pnl():
 # =====================================
 def calculate_realized_pnl():
 
-    conn = get_connection()
+    logger.info(
+        "Calculating realized PnL..."
+    )
 
-    trades = pd.read_sql_query(
-
-        """
+    trades = query_df("""
 
         SELECT *
 
@@ -119,13 +162,22 @@ def calculate_realized_pnl():
 
         ORDER BY date ASC, id ASC
 
-        """,
+    """)
 
-        conn
+    # =====================================
+    # EMPTY SAFETY
+    # =====================================
+    if trades.empty:
 
-    )
+        return {
 
-    conn.close()
+            "trades":
+                pd.DataFrame(),
+
+            "total_realized":
+                0
+
+        }
 
     realized_rows = []
 
@@ -133,17 +185,22 @@ def calculate_realized_pnl():
 
     inventory = {}
 
+    # =====================================
+    # FIFO MATCHING
+    # =====================================
     for _, trade in trades.iterrows():
 
         symbol = trade["symbol"]
 
         side = trade["side"]
 
-        shares = trade["shares"]
+        shares = int(
+            trade["shares"]
+        )
 
-        fill_price = trade[
-            "fill_price"
-        ]
+        fill_price = float(
+            trade["fill_price"]
+        )
 
         if symbol not in inventory:
 
@@ -156,9 +213,11 @@ def calculate_realized_pnl():
 
             inventory[symbol].append({
 
-                "shares": shares,
+                "shares":
+                    shares,
 
-                "price": fill_price
+                "price":
+                    fill_price
 
             })
 
@@ -208,6 +267,9 @@ def calculate_realized_pnl():
 
                 remaining -= matched
 
+                # =====================================
+                # REMOVE EMPTY LOT
+                # =====================================
                 if lot["shares"] <= 0:
 
                     inventory[
@@ -216,9 +278,11 @@ def calculate_realized_pnl():
 
             realized_rows.append({
 
-                "symbol": symbol,
+                "symbol":
+                    symbol,
 
-                "shares": shares,
+                "shares":
+                    shares,
 
                 "sell_price":
                     fill_price,
@@ -232,9 +296,18 @@ def calculate_realized_pnl():
         realized_rows
     )
 
+    logger.info(
+
+        f"Calculated realized "
+        f"PnL for "
+        f"{len(realized_df)} trades"
+
+    )
+
     return {
 
-        "trades": realized_df,
+        "trades":
+            realized_df,
 
         "total_realized":
             total_realized
@@ -243,9 +316,13 @@ def calculate_realized_pnl():
 
 
 # =====================================
-# COMBINED PNL
+# COMBINED PNL SUMMARY
 # =====================================
 def get_pnl_summary():
+
+    logger.info(
+        "Building PnL summary..."
+    )
 
     unrealized = (
         calculate_unrealized_pnl()
@@ -255,7 +332,7 @@ def get_pnl_summary():
         calculate_realized_pnl()
     )
 
-    return {
+    summary = {
 
         "unrealized_positions":
 
@@ -282,3 +359,9 @@ def get_pnl_summary():
             ]
 
     }
+
+    logger.info(
+        "PnL summary complete"
+    )
+
+    return summary

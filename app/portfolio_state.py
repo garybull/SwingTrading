@@ -1,35 +1,38 @@
 # app/portfolio_state.py
 
-import sqlite3
-import pandas as pd
+from app.logger import logger
 
-from app.config import DB_NAME
+from app.db_service import (
+    query_df,
+    execute
+)
 
 
 # =====================================
-# UPDATE SYSTEM EQUITY
+# REFRESH SYSTEM STATE
 # =====================================
 def refresh_system_state():
 
-    conn = sqlite3.connect(DB_NAME)
+    logger.info(
+        "Refreshing system state..."
+    )
 
-    positions = pd.read_sql_query(
-
-        """
+    # =====================================
+    # LOAD POSITIONS
+    # =====================================
+    positions = query_df("""
 
         SELECT
+
             market_value
 
         FROM positions
 
-        """,
+    """)
 
-        conn
-
-    )
-
-    total_market_value = 0
-
+    # =====================================
+    # TOTAL MARKET VALUE
+    # =====================================
     if not positions.empty:
 
         total_market_value = float(
@@ -40,25 +43,24 @@ def refresh_system_state():
 
         )
 
-    # =====================================
-    # GET CASH
-    # =====================================
-    state = pd.read_sql_query(
+    else:
 
-        """
+        total_market_value = 0
+
+    # =====================================
+    # LOAD CASH
+    # =====================================
+    state = query_df("""
 
         SELECT
+
             current_cash
 
         FROM system_state
 
         WHERE id = 1
 
-        """,
-
-        conn
-
-    )
+    """)
 
     if not state.empty:
 
@@ -78,34 +80,34 @@ def refresh_system_state():
     # TOTAL EQUITY
     # =====================================
     equity = (
+
         total_market_value
         + cash
+
     )
 
     # =====================================
-    # UPDATE STATE
+    # UPDATE SYSTEM STATE
     # =====================================
-    cur = conn.cursor()
-
-    cur.execute(
-
-        """
+    execute("""
 
         UPDATE system_state
 
-        SET
-            current_equity = ?
+        SET current_equity = ?
 
         WHERE id = 1
 
-        """,
+    """, (
 
-        (equity,)
+        equity,
+
+    ))
+
+    logger.info(
+
+        f"System equity updated: "
+        f"${equity:,.2f}"
 
     )
-
-    conn.commit()
-
-    conn.close()
 
     return equity

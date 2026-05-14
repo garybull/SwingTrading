@@ -1,9 +1,12 @@
 # app/price_cache.py
 
 import time
-import yfinance as yf
 
 from app.logger import logger
+
+from app.market_data_service import (
+    get_live_price
+)
 
 
 # =====================================
@@ -27,7 +30,7 @@ def get_live_prices(symbols):
     now = time.time()
 
     # =====================================
-    # USE CACHE
+    # CACHE HIT
     # =====================================
     if (
 
@@ -50,76 +53,47 @@ def get_live_prices(symbols):
         "Refreshing live prices..."
     )
 
-    try:
+    prices = {}
 
-        data = yf.download(
+    # =====================================
+    # SYMBOL LOOP
+    # =====================================
+    for symbol in symbols:
 
-            tickers=symbols,
+        try:
 
-            period="1d",
+            price = get_live_price(
+                symbol
+            )
 
-            interval="1m",
+            if price > 0:
 
-            progress=False,
+                prices[symbol] = (
+                    price
+                )
 
-            auto_adjust=True
+            else:
 
-        )
+                logger.warning(
 
-        prices = {}
+                    f"Invalid live price "
+                    f"for {symbol}"
 
-        # =====================================
-        # MULTI SYMBOL
-        # =====================================
-        if len(symbols) > 1:
+                )
 
-            for symbol in symbols:
+        except Exception as e:
 
-                try:
+            logger.error(
 
-                    price = float(
-
-                        data["Close"][
-                            symbol
-                        ]
-
-                        .dropna()
-
-                        .iloc[-1]
-
-                    )
-
-                    prices[symbol] = (
-                        price
-                    )
-
-                except:
-
-                    logger.warning(
-
-                        f"No price for "
-                        f"{symbol}"
-
-                    )
-
-        # =====================================
-        # SINGLE SYMBOL
-        # =====================================
-        else:
-
-            symbol = symbols[0]
-
-            price = float(
-
-                data["Close"]
-
-                .dropna()
-
-                .iloc[-1]
+                f"Price fetch failed "
+                f"for {symbol}: {e}"
 
             )
 
-            prices[symbol] = price
+    # =====================================
+    # UPDATE CACHE
+    # =====================================
+    if len(prices) > 0:
 
         PRICE_CACHE = prices
 
@@ -131,12 +105,11 @@ def get_live_prices(symbols):
 
         return prices
 
-    except Exception as e:
+    # =====================================
+    # FALLBACK
+    # =====================================
+    logger.warning(
+        "Returning stale cache"
+    )
 
-        logger.error(
-
-            f"Price cache failed: {e}"
-
-        )
-
-        return PRICE_CACHE
+    return PRICE_CACHE

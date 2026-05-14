@@ -1,6 +1,4 @@
 # app/live_portfolio.py
-
-import sqlite3
 import pandas as pd
 
 from app.config import DB_NAME
@@ -10,15 +8,9 @@ from app.price_cache import (
 )
 
 from app.logger import logger
-
-
-# =====================================
-# DB CONNECTION
-# =====================================
-def get_connection():
-
-    return sqlite3.connect(DB_NAME)
-
+from app.db_service import (
+    query_df
+)
 
 # =====================================
 # GET LIVE PORTFOLIO
@@ -27,23 +19,15 @@ def get_live_portfolio():
 
     conn = get_connection()
 
-    positions = pd.read_sql_query(
-
-        """
+    positions = query_df("""
 
         SELECT *
 
         FROM positions
 
-        """,
+    """)
 
-        conn
-
-    )
-
-    system_state = pd.read_sql_query(
-
-        """
+    system_state = query_df("""
 
         SELECT *
 
@@ -51,11 +35,7 @@ def get_live_portfolio():
 
         LIMIT 1
 
-        """,
-
-        conn
-
-    )
+    """)
 
     conn.close()
 

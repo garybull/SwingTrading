@@ -1,4 +1,4 @@
-# app/recommendation_engine.py
+# app/action_engine.py
 
 import pandas as pd
 
@@ -11,8 +11,10 @@ from app.logger import logger
 def build_action_plan(
 
     recommended_portfolio,
-    positions,
-    threshold=0.02
+
+    current_positions,
+
+    threshold=0.01
 
 ):
 
@@ -23,18 +25,37 @@ def build_action_plan(
     actions = []
 
     # =====================================
-    # EMPTY CHECKS
+    # EMPTY SAFETY
     # =====================================
     if recommended_portfolio is None:
 
-        return actions
+        return []
 
     if len(recommended_portfolio) == 0:
 
-        return actions
+        return []
 
     # =====================================
-    # LOOP RECOMMENDATIONS
+    # CURRENT POSITIONS MAP
+    # =====================================
+    current_map = {}
+
+    if current_positions is not None:
+
+        if len(current_positions) > 0:
+
+            current_map = {
+
+                row["symbol"]: row
+
+                for _, row
+
+                in current_positions.iterrows()
+
+            }
+
+    # =====================================
+    # BUILD TARGET ACTIONS
     # =====================================
     for _, row in recommended_portfolio.iterrows():
 
@@ -49,15 +70,6 @@ def build_action_plan(
 
         )
 
-        score = float(
-
-            row.get(
-                "score",
-                0
-            )
-
-        )
-
         current_price = float(
 
             row.get(
@@ -67,10 +79,10 @@ def build_action_plan(
 
         )
 
-        position_size = float(
+        target_value = float(
 
             row.get(
-                "position_size",
+                "target_value",
                 0
             )
 
@@ -85,74 +97,67 @@ def build_action_plan(
 
         )
 
-        # =====================================
-        # LOOKUP CURRENT POSITION
-        # =====================================
-        matching_position = positions[
+        score = float(
 
-            positions["symbol"]
-            == symbol
-
-        ]
-
-        if not matching_position.empty:
-
-            current_allocation = float(
-
-                matching_position.iloc[0]
-                .get(
-                    "allocation_pct",
-                    0
-                )
-
+            row.get(
+                "score",
+                0
             )
+
+        )
+
+        # =====================================
+        # CURRENT POSITION
+        # =====================================
+        if symbol in current_map:
+
+            current_row = current_map[
+                symbol
+            ]
 
             current_shares = int(
 
-                matching_position.iloc[0]
-                .get(
+                current_row.get(
                     "shares",
                     0
                 )
 
             )
 
-            entry_price = float(
+            current_allocation = float(
 
-                matching_position.iloc[0]
-                .get(
-                    "entry_price",
-                    current_price
+                current_row.get(
+                    "allocation_pct",
+                    0
                 )
 
             )
 
         else:
 
-            current_allocation = 0
-
             current_shares = 0
 
-            entry_price = current_price
+            current_allocation = 0
 
         # =====================================
         # ALLOCATION DIFFERENCE
         # =====================================
-        diff = (
+        diff = abs(
 
             target_allocation
+
             - current_allocation
 
         )
 
         # =====================================
-        # DETERMINE ACTION
+        # SKIP SMALL CHANGES
         # =====================================
-        if abs(diff) < threshold:
+        if diff < threshold:
 
             action = "HOLD"
 
-        elif diff > 0:
+        elif target_allocation > current_allocation:
 
             action = "BUY"
 
@@ -187,67 +192,46 @@ def build_action_plan(
 
         )
 
-        # =====================================
-        # RISK / REWARD %
-        # =====================================
-        if current_price > 0:
+        risk_pct = round(
 
-            risk_pct = round(
+            (
 
-                (
-                    (
-                        current_price
-                        - stop
-                    )
-                    / current_price
-                ) * 100,
+                (current_price - stop)
 
-                2
+                / current_price
 
-            )
+            ) * 100,
 
-            reward_pct = round(
+            2
 
-                (
-                    (
-                        target_1
-                        - current_price
-                    )
-                    / current_price
-                ) * 100,
+        )
 
-                2
+        reward_pct = round(
 
-            )
+            (
 
-        else:
+                (target_1 - current_price)
 
-            risk_pct = 0
+                / current_price
 
-            reward_pct = 0
+            ) * 100,
+
+            2
+
+        )
+
+        rr_ratio = round(
+
+            reward_pct / risk_pct,
+
+            2
+
+        ) if risk_pct > 0 else 0
 
         # =====================================
-        # R/R RATIO
+        # ACTION OBJECT
         # =====================================
-        if risk_pct > 0:
-
-            rr_ratio = round(
-
-                reward_pct
-                / risk_pct,
-
-                2
-
-            )
-
-        else:
-
-            rr_ratio = 0
-
-        # =====================================
-        # BUILD ACTION OBJECT
-        # =====================================
-        action_item = {
+        actions.append({
 
             "symbol":
                 symbol,
@@ -265,16 +249,10 @@ def build_action_plan(
                 current_allocation,
 
             "current_price":
-                round(
-                    current_price,
-                    2
-                ),
+                current_price,
 
             "position_size":
-                round(
-                    position_size,
-                    2
-                ),
+                target_value,
 
             "recommended_shares":
                 recommended_shares,
@@ -283,10 +261,7 @@ def build_action_plan(
                 current_shares,
 
             "entry_price":
-                round(
-                    entry_price,
-                    2
-                ),
+                current_price,
 
             "stop":
                 stop,
@@ -306,11 +281,7 @@ def build_action_plan(
             "rr_ratio":
                 rr_ratio
 
-        }
-
-        actions.append(
-            action_item
-        )
+        })
 
     logger.info(
 
