@@ -4,6 +4,7 @@ import sqlite3
 
 from app.config import DB_NAME
 
+SCHEMA_VERSION = "1.3"
 
 # =====================================
 # INIT DATABASE
@@ -226,6 +227,29 @@ def init_db():
         entry_price REAL,
 
         entry_date TEXT,
+
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+    )
+
+    """)
+
+    # =====================================
+    # ALERTS SENT
+    # =====================================
+    cur.execute("""
+
+    CREATE TABLE IF NOT EXISTS alerts_sent (
+
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+        symbol TEXT,
+
+        alert_type TEXT,
+
+        alert_price REAL,
+
+        alert_date TEXT,
 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 
