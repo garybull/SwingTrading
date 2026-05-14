@@ -11,7 +11,7 @@ from app.logger import logger
 from app.emailer import send_email
 
 
-DB_PATH = "DB_PATH = "/home/ubuntu/SwingTrading/trading_system.db"
+DB_PATH = "/home/ubuntu/SwingTrading/trading_system.db"
 
 
 # =====================================
