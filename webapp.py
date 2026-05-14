@@ -964,11 +964,11 @@ def log_trade():
 
     symbol = request.form.get(
         "symbol"
-    )
+    ).upper()
 
     side = request.form.get(
         "side"
-    )
+    ).upper()
 
     shares = int(
 
@@ -998,6 +998,9 @@ def log_trade():
 
     cur = conn.cursor()
 
+    # =====================================
+    # INSERT TRADE
+    # =====================================
     cur.execute("""
 
         INSERT INTO executed_trades (
@@ -1022,19 +1025,208 @@ def log_trade():
 
     """, (
 
-        symbol.upper(),
-
-        side.upper(),
-
+        symbol,
+        side,
         shares,
-
         fill_price,
-
         total_value,
-
         notes
 
     ))
+
+    # =====================================
+    # EXISTING POSITION?
+    # =====================================
+    existing = cur.execute(
+
+        """
+
+        SELECT
+            shares,
+            entry_price
+
+        FROM positions
+
+        WHERE symbol = ?
+
+        """,
+
+        (symbol,)
+
+    ).fetchone()
+
+    # =====================================
+    # BUY
+    # =====================================
+    if side == "BUY":
+
+        if existing:
+
+            old_shares = int(
+                existing[0]
+            )
+
+            old_price = float(
+                existing[1]
+            )
+
+            new_shares = (
+                old_shares + shares
+            )
+
+            avg_price = (
+
+                (
+                    old_shares * old_price
+                )
+                +
+                (
+                    shares * fill_price
+                )
+
+            ) / new_shares
+
+            market_value = (
+                new_shares * fill_price
+            )
+
+            cur.execute(
+
+                """
+
+                UPDATE positions
+
+                SET
+
+                    shares = ?,
+                    entry_price = ?,
+                    current_price = ?,
+                    market_value = ?
+
+                WHERE symbol = ?
+
+                """,
+
+                (
+
+                    new_shares,
+                    avg_price,
+                    fill_price,
+                    market_value,
+                    symbol
+
+                )
+
+            )
+
+        else:
+
+            market_value = (
+                shares * fill_price
+            )
+
+            cur.execute(
+
+                """
+
+                INSERT INTO positions (
+
+                    symbol,
+                    shares,
+                    entry_price,
+                    current_price,
+                    market_value,
+                    allocation_pct,
+                    momentum_score,
+                    volatility,
+                    rebalance_date
+
+                )
+
+                VALUES (
+
+                    ?, ?, ?, ?, ?,
+                    0, 0, 0, ''
+
+                )
+
+                """,
+
+                (
+
+                    symbol,
+                    shares,
+                    fill_price,
+                    fill_price,
+                    market_value
+
+                )
+
+            )
+
+    # =====================================
+    # SELL
+    # =====================================
+    elif side == "SELL":
+
+        if existing:
+
+            old_shares = int(
+                existing[0]
+            )
+
+            new_shares = (
+                old_shares - shares
+            )
+
+            if new_shares <= 0:
+
+                cur.execute(
+
+                    """
+
+                    DELETE FROM positions
+
+                    WHERE symbol = ?
+
+                    """,
+
+                    (symbol,)
+
+                )
+
+            else:
+
+                market_value = (
+                    new_shares * fill_price
+                )
+
+                cur.execute(
+
+                    """
+
+                    UPDATE positions
+
+                    SET
+
+                        shares = ?,
+                        current_price = ?,
+                        market_value = ?
+
+                    WHERE symbol = ?
+
+                    """,
+
+                    (
+
+                        new_shares,
+                        fill_price,
+                        market_value,
+                        symbol
+
+                    )
+
+                )
 
     conn.commit()
 
@@ -1043,9 +1235,9 @@ def log_trade():
     logger.info(
 
         f"MANUAL TRADE | "
-        f"{side.upper()} "
+        f"{side} "
         f"{shares} "
-        f"{symbol.upper()} @ "
+        f"{symbol} @ "
         f"${fill_price:.2f}"
 
     )
@@ -1053,7 +1245,6 @@ def log_trade():
     return redirect(
         url_for("trades")
     )
-
 
 # =====================================
 # RUN
