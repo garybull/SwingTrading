@@ -126,7 +126,7 @@ def get_current_price(symbol):
 # =====================================
 def calculate_levels(
     symbol,
-    current_price
+    entry_price
 ):
 
     try:
@@ -149,16 +149,54 @@ def calculate_levels(
 
             return None
 
-        df["TR"] = (
+        # ==============================
+        # TRUE RANGE
+        # ==============================
+        high_low = (
 
             df["High"]
             - df["Low"]
 
         )
 
+        high_close = abs(
+
+            df["High"]
+            - df["Close"].shift()
+
+        )
+
+        low_close = abs(
+
+            df["Low"]
+            - df["Close"].shift()
+
+        )
+
+        ranges = pd.concat(
+
+            [
+
+                high_low,
+                high_close,
+                low_close
+
+            ],
+
+            axis=1
+
+        )
+
+        true_range = ranges.max(
+            axis=1
+        )
+
+        # ==============================
+        # ATR
+        # ==============================
         atr = (
 
-            df["TR"]
+            true_range
 
             .rolling(14)
 
@@ -168,19 +206,34 @@ def calculate_levels(
 
         )
 
+        atr = float(atr)
+
+        # ==============================
+        # FIXED LEVELS
+        # BASED ON ENTRY
+        # ==============================
         stop_price = round(
-            current_price - (2 * atr),
+
+            entry_price
+            - (2 * atr),
+
             2
+
         )
 
         target_price = round(
-            current_price + (4 * atr),
+
+            entry_price
+            + (4 * atr),
+
             2
+
         )
 
         return {
 
             "stop": stop_price,
+
             "target": target_price
 
         }
@@ -192,7 +245,6 @@ def calculate_levels(
         )
 
         return None
-
 
 # =====================================
 # CHECK DUPLICATE ALERT
@@ -363,11 +415,15 @@ def monitor_positions():
 
             continue
 
+        entry_price = float(
+            row["avg_price"]
+        )
+
         levels = calculate_levels(
 
             symbol,
 
-            current_price
+            entry_price
 
         )
 
