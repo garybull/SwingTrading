@@ -417,7 +417,7 @@ def monitor_positions():
             continue
 
         entry_price = float(
-            row["avg_price"]
+            row["entry_price"]
         )
 
         levels = calculate_levels(
