@@ -6,96 +6,72 @@
 
 <div class="card">
 
-    <h2>
-        Manual Scan
-    </h2>
+    <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        flex-wrap:wrap;
+        gap:20px;
+    ">
 
-    <form method="POST" action="/run_scan" onsubmit="showScanStatus()">
+        <div>
 
-        <button id="scanButton" type="submit">
+            <h2 style="margin-bottom:6px;">
+                Trade Recommendations
+            </h2>
 
-            Run Rebalance Scan
+            <p class="muted">
+                Momentum-ranked portfolio construction and execution planning
+            </p>
 
-        </button>
+        </div>
 
-    </form>
+        <form method="POST" action="/run_scan" id="scan-form">
 
-    <div id="scanStatus" style="
-            display:none;
-            margin-top:20px;
+            <button type="submit" id="scan-btn">
+                Run Rebalance Scan
+            </button>
+
+        </form>
+
+    </div>
+
+    <div id="scan-status" style="display:none; margin-top:20px;">
+
+        <div style="
+            display:flex;
+            align-items:center;
+            gap:16px;
         ">
 
-        <div class="spinner"></div>
+            <div class="spinner"></div>
 
-        <p>
+            <div>
 
-            Running rebalance scan...
+                <div style="
+                    font-weight:700;
+                    font-size:18px;
+                    color:white;
+                ">
+                    Running Scan...
+                </div>
 
-        </p>
+                <div class="muted">
+                    Calculating rankings, allocations,
+                    and action plans
+                </div>
 
-        <p class="warning">
+            </div>
 
-            Pulling market data,
-            calculating momentum,
-            generating recommendations...
-
-        </p>
+        </div>
 
     </div>
 
 </div>
 
-<script>
-
-    function showScanStatus() {
-
-        document.getElementById(
-
-            "scanStatus"
-
-        ).style.display = "block";
-
-        document.getElementById(
-
-            "scanButton"
-
-        ).disabled = true;
-
-        document.getElementById(
-
-            "scanButton"
-
-        ).innerHTML = (
-
-                "Running Scan..."
-
-            );
-
-    }
-
-</script>
-
-{% if warnings %}
-
-<div class="card">
-
-    <h2>
-        Risk Warnings
-    </h2>
-
-    {% for w in warnings %}
-
-    <p class="negative">
-
-        {{ w }}
-
-    </p>
-
-    {% endfor %}
-
-</div>
-
-{% endif %}
+<!-- =====================================
+RECOMMENDED PORTFOLIO
+===================================== -->
 
 <div class="card">
 
@@ -103,62 +79,130 @@
         Recommended Portfolio
     </h2>
 
-    <table>
+    <div class="chart-container">
 
-        <thead>
+        <table>
 
-            <tr>
+            <thead>
 
-                <th>Symbol</th>
-                <th>Target Allocation</th>
-                <th>Score</th>
-                <th>Action</th>
+                <tr>
 
-            </tr>
+                    <th>Symbol</th>
 
-        </thead>
+                    <th>Action</th>
 
-        <tbody>
+                    <th>Allocation</th>
 
-            {% for r in recommended_portfolio %}
+                    <th>Score</th>
 
-            <tr>
+                    <th>Current Price</th>
 
-                <td>
-                    {{ r.symbol }}
-                </td>
+                    <th>Position Size</th>
 
-                <td>
+                    <th>Shares</th>
 
-                    {{ "%.2f"|format(
-                    r.target_allocation * 100
-                    ) }}%
+                </tr>
 
-                </td>
+            </thead>
 
-                <td>
+            <tbody>
 
-                    {{ "%.2f"|format(
-                    r.score
-                    ) }}
+                {% for r in recommended_portfolio %}
 
-                </td>
+                <tr>
 
-                <td>
+                    <td>
 
-                    {{ r.action }}
+                        <strong style="
+                            color:white;
+                            font-size:16px;
+                        ">
+                            {{ r.symbol }}
+                        </strong>
 
-                </td>
+                    </td>
 
-            </tr>
+                    <td>
 
-            {% endfor %}
+                        {% if r.action == "BUY" %}
 
-        </tbody>
+                        <span class="positive">
+                            BUY
+                        </span>
 
-    </table>
+                        {% elif r.action == "SELL" %}
+
+                        <span class="negative">
+                            SELL
+                        </span>
+
+                        {% else %}
+
+                        <span class="warning">
+                            HOLD
+                        </span>
+
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        {{ "%.1f"|format(
+                        r.target_allocation * 100
+                        ) }}%
+
+                    </td>
+
+                    <td>
+
+                        {{ "%.2f"|format(
+                        r.score
+                        ) }}
+
+                    </td>
+
+                    <td>
+
+                        ${{ "%.2f"|format(
+                        r.current_price
+                        ) }}
+
+                    </td>
+
+                    <td>
+
+                        ${{ "{:,.0f}".format(
+                        r.position_size
+                        ) }}
+
+                    </td>
+
+                    <td>
+
+                        <strong style="
+                            color:white;
+                        ">
+                            {{ r.recommended_shares }}
+                        </strong>
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
 
 </div>
+
+<!-- =====================================
+CURRENT POSITIONS
+===================================== -->
 
 <div class="card">
 
@@ -166,60 +210,76 @@
         Current Positions
     </h2>
 
-    <table>
+    <div class="chart-container">
 
-        <thead>
+        <table>
 
-            <tr>
+            <thead>
 
-                <th>Symbol</th>
-                <th>Shares</th>
-                <th>Allocation</th>
-                <th>Market Value</th>
+                <tr>
 
-            </tr>
+                    <th>Symbol</th>
+                    <th>Shares</th>
+                    <th>Allocation</th>
+                    <th>Market Value</th>
 
-        </thead>
+                </tr>
 
-        <tbody>
+            </thead>
 
-            {% for p in positions %}
+            <tbody>
 
-            <tr>
+                {% for p in positions %}
 
-                <td>
-                    {{ p.symbol }}
-                </td>
+                <tr>
 
-                <td>
-                    {{ p.shares }}
-                </td>
+                    <td>
 
-                <td>
+                        <strong style="
+                            color:white;
+                        ">
+                            {{ p.symbol }}
+                        </strong>
 
-                    {{ "%.2f"|format(
-                    p.allocation_pct * 100
-                    ) }}%
+                    </td>
 
-                </td>
+                    <td>
 
-                <td>
+                        {{ p.shares }}
 
-                    ${{ "{:,.2f}".format(
-                    p.market_value
-                    ) }}
+                    </td>
 
-                </td>
+                    <td>
 
-            </tr>
+                        {{ "%.2f"|format(
+                        p.allocation_pct * 100
+                        ) }}%
 
-            {% endfor %}
+                    </td>
 
-        </tbody>
+                    <td>
 
-    </table>
+                        ${{ "{:,.2f}".format(
+                        p.market_value
+                        ) }}
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
 
 </div>
+
+<!-- =====================================
+MOMENTUM RANKINGS
+===================================== -->
 
 <div class="card">
 
@@ -227,177 +287,227 @@
         Momentum Rankings
     </h2>
 
-    <table>
+    <div class="chart-container">
 
-        <thead>
+        <table>
 
-            <tr>
+            <thead>
 
-                <th>Rank</th>
-                <th>Symbol</th>
-                <th>Score</th>
+                <tr>
 
-            </tr>
+                    <th>Rank</th>
+                    <th>Symbol</th>
+                    <th>Score</th>
 
-        </thead>
+                </tr>
 
-        <tbody>
+            </thead>
 
-            {% for r in momentum_rankings %}
+            <tbody>
 
-            <tr>
+                {% for r in momentum_rankings %}
 
-                <td>
+                <tr>
 
-                    {{ loop.index }}
+                    <td>
 
-                </td>
+                        {{ r.rank }}
 
-                <td>
+                    </td>
 
-                    {{ r.symbol }}
+                    <td>
 
-                </td>
+                        <strong style="
+                            color:white;
+                        ">
+                            {{ r.symbol }}
+                        </strong>
 
-                <td>
+                    </td>
 
-                    {{ "%.2f"|format(
-                    r.score
-                    ) }}
+                    <td>
 
-                </td>
+                        {{ "%.2f"|format(
+                        r.score
+                        ) }}
 
-            </tr>
+                    </td>
 
-            {% endfor %}
+                </tr>
 
-        </tbody>
+                {% endfor %}
 
-    </table>
+            </tbody>
+
+        </table>
+
+    </div>
 
 </div>
 
-<div class="card">
+<!-- =====================================
+ACTION PLAN + CHARTS
+===================================== -->
 
-    <h2>
-        Hourly Trade Setups
-    </h2>
-
-</div>
-
-{% for c in recommendation_charts %}
+{% for c in actions %}
 
 <div class="card">
 
-    <div class="grid">
+    <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:24px;
+        flex-wrap:wrap;
+        margin-bottom:24px;
+    ">
 
         <div>
 
-            <h2>
-
+            <h2 style="
+                margin-bottom:10px;
+            ">
                 {{ c.symbol }}
-
             </h2>
 
-            <p>
+            <div class="status-pill">
 
-                Entry:
+                {{ c.action }}
 
-                <strong>
+            </div>
 
-                    ${{ c.entry }}
+        </div>
 
-                </strong>
+        <div style="
+            display:grid;
+            grid-template-columns:
+                repeat(3, minmax(140px,1fr));
+            gap:18px;
+            flex:1;
+            min-width:320px;
+        ">
 
-            </p>
+            <div>
 
-            <p>
+                <div class="muted">
+                    Current Price
+                </div>
 
-                Stop:
+                <div class="metric" style="
+                    font-size:30px;
+                ">
+                    ${{ c.current_price }}
+                </div>
 
-                <strong class="negative">
+            </div>
 
+            <div>
+
+                <div class="muted">
+                    Stop
+                </div>
+
+                <div class="metric negative" style="
+                    font-size:30px;
+                ">
                     ${{ c.stop }}
+                </div>
 
-                </strong>
+            </div>
 
-            </p>
+            <div>
 
-            <p>
+                <div class="muted">
+                    Target
+                </div>
 
-                Target 1:
-
-                <strong class="positive">
-
+                <div class="metric positive" style="
+                    font-size:30px;
+                ">
                     ${{ c.target_1 }}
+                </div>
 
-                </strong>
-
-            </p>
-
-            <p>
-
-                Target 2:
-
-                <strong class="positive">
-
-                    ${{ c.target_2 }}
-
-                </strong>
-
-            </p>
-
-            <p>
-
-                Risk:
-
-                <strong class="negative">
-
-                    {{ c.risk_pct }}%
-
-                </strong>
-
-            </p>
-
-            <p>
-
-                Reward:
-
-                <strong class="positive">
-
-                    {{ c.reward_pct }}%
-
-                </strong>
-
-            </p>
-
-            <p>
-
-                Risk / Reward:
-
-                <strong>
-
-                    {{ c.rr_ratio }}R
-
-                </strong>
-
-            </p>
+            </div>
 
         </div>
 
     </div>
 
-    <div id="chart_{{ c.symbol }}" style="height:700px; width:100%;"></div>
+    <!-- =====================================
+    RISK GRID
+    ===================================== -->
+
+    <div class="grid" style="
+        margin-bottom:24px;
+    ">
+
+        <div class="card" style="
+            margin-bottom:0;
+        ">
+
+            <div class="muted">
+                Risk
+            </div>
+
+            <div class="metric negative">
+
+                {{ c.risk_pct }}%
+
+            </div>
+
+        </div>
+
+        <div class="card" style="
+            margin-bottom:0;
+        ">
+
+            <div class="muted">
+                Reward
+            </div>
+
+            <div class="metric positive">
+
+                {{ c.reward_pct }}%
+
+            </div>
+
+        </div>
+
+        <div class="card" style="
+            margin-bottom:0;
+        ">
+
+            <div class="muted">
+                Risk / Reward
+            </div>
+
+            <div class="metric">
+
+                {{ c.rr_ratio }}R
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- =====================================
+    CHART
+    ===================================== -->
+
+    <div id="chart_{{ c.symbol }}" style="
+            width:100%;
+            height:700px;
+            border-radius:20px;
+            overflow:hidden;
+        "></div>
 
 </div>
 
 <script>
 
     let chart_{{ c.symbol }} =
-
-        JSON.parse(
-            `{{ c.chart | safe }}`
-        );
+    { { c.chart | safe } };
 
     Plotly.newPlot(
 
@@ -411,7 +521,9 @@
 
             responsive: true,
 
-            scrollZoom: true
+            scrollZoom: true,
+
+            displayModeBar: true
 
         }
 
@@ -420,5 +532,39 @@
 </script>
 
 {% endfor %}
+
+<!-- =====================================
+SCAN STATUS SCRIPT
+===================================== -->
+
+<script>
+
+    document
+        .getElementById("scan-form")
+        .addEventListener(
+
+            "submit",
+
+            function () {
+
+                document
+                    .getElementById("scan-btn")
+                    .disabled = true;
+
+                document
+                    .getElementById("scan-btn")
+                    .innerText =
+                    "Running...";
+
+                document
+                    .getElementById("scan-status")
+                    .style.display =
+                    "block";
+
+            }
+
+        );
+
+</script>
 
 {% endblock %}

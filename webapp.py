@@ -4,6 +4,8 @@ import sqlite3
 import json
 import plotly.graph_objs as go
 import plotly.utils
+import yfinance as yf
+from app.portfolio_state import refresh_system_state
 from app.chart_engine import (
     build_recommendation_chart
 )
@@ -148,6 +150,10 @@ def dashboard():
 @app.route("/recommendations")
 def recommendations():
 
+    logger.info(
+        "Loading recommendations page..."
+    )
+
     conn = get_connection()
 
     # =====================================
@@ -161,7 +167,26 @@ def recommendations():
 
         FROM recommended_portfolio
 
-        ORDER BY target_allocation DESC
+        ORDER BY score DESC
+
+        """,
+
+        conn
+
+    )
+
+    # =====================================
+    # CURRENT POSITIONS
+    # =====================================
+    positions = pd.read_sql_query(
+
+        """
+
+        SELECT *
+
+        FROM positions
+
+        ORDER BY market_value DESC
 
         """,
 
@@ -180,7 +205,7 @@ def recommendations():
 
         FROM rankings
 
-        ORDER BY score DESC
+        ORDER BY rank ASC
 
         LIMIT 25
 
@@ -193,121 +218,165 @@ def recommendations():
     conn.close()
 
     # =====================================
-    # ACTION PLAN
+    # GET EQUITY
     # =====================================
-    actions = build_action_plan(
-        recommended_portfolio
+    refresh_system_state()
+
+    dashboard_data = get_dashboard_data()
+
+    equity = float(
+
+        dashboard_data["system_state"]
+        ["starting_capital"]
+
     )
 
     # =====================================
-    # CHARTS
+    # ENRICH RECOMMENDATIONS
     # =====================================
-    recommendation_charts = []
-    print(recommendation_charts)
     if not recommended_portfolio.empty:
-
-        for _, row in recommended_portfolio.iterrows():
+        print("EQUITY:", equity)
+        for idx, row in recommended_portfolio.iterrows():
 
             symbol = row["symbol"]
 
             try:
 
-                chart_data = (
+                ticker = yf.Ticker(symbol)
 
-                    build_recommendation_chart(
-                        symbol
+                hist = ticker.history(period="1d")
+
+                if not hist.empty:
+
+                    current_price = float(
+
+                        hist["Close"].iloc[-1]
+
                     )
 
-                )
+                else:
 
-                if chart_data:
-
-                    recommendation_charts.append(
-                        chart_data
-                    )
+                    current_price = 0
 
             except Exception as e:
 
                 logger.error(
+                    f"Price fetch failed "
+                    f"for {symbol}: {e}"
+                )
 
-                    f"Chart failed for "
-                    f"{symbol}: {e}"
+                current_price = 0
+
+            target_allocation = float(
+                row["target_allocation"]
+            )
+
+            position_size = (
+                equity * target_allocation
+            )
+
+            if current_price > 0:
+
+                shares = int(
+
+                    position_size
+                    / current_price
 
                 )
 
+            else:
+
+                shares = 0
+
+            recommended_portfolio.loc[
+                idx,
+                "current_price"
+            ] = round(
+                current_price,
+                2
+            )
+
+            recommended_portfolio.loc[
+                idx,
+                "position_size"
+            ] = round(
+                position_size,
+                2
+            )
+
+            recommended_portfolio.loc[
+                idx,
+                "recommended_shares"
+            ] = shares
+
     # =====================================
-    # RISK WARNINGS
+    # BUILD ACTION PLAN
     # =====================================
-    warnings = []
+    actions = build_action_plan(
 
-    try:
+        recommended_portfolio,
 
-        from app.risk_engine import (
-            get_risk_report
-        )
+        positions
 
-        risk = get_risk_report()
+    )
 
-        exposure = risk[
-            "effective_exposure"
-        ]
+    # =====================================
+    # BUILD CHARTS
+    # =====================================
+    for action in actions:
 
-        if exposure > 250:
+        try:
 
-            warnings.append(
+            chart_json = build_chart(
 
-                "🔴 Extreme leverage "
-                "detected"
+                action["symbol"],
+
+                stop=action.get("stop"),
+
+                target=action.get("target_1")
 
             )
 
-        elif exposure > 180:
+            action["chart"] = chart_json
 
-            warnings.append(
+        except Exception as e:
 
-                "⚠️ Aggressive "
-                "portfolio exposure"
+            logger.error(
+
+                f"Chart failed for "
+                f"{action['symbol']}: {e}"
 
             )
 
-    except Exception as e:
+            action["chart"] = {}
 
-        logger.error(
-            f"Risk warning failed: {e}"
-        )
+    logger.info(
+        "Recommendations page loaded"
+    )
 
-    # =====================================
-    # RENDER
-    # =====================================
     return render_template(
 
         "recommendations.html",
 
-        recommended_portfolio=(
-
+        recommended_portfolio=
             recommended_portfolio
             .to_dict(
                 orient="records"
-            )
+            ),
 
-        ),
+        positions=
+            positions
+            .to_dict(
+                orient="records"
+            ),
 
-        momentum_rankings=(
-
+        momentum_rankings=
             momentum_rankings
             .to_dict(
                 orient="records"
-            )
+            ),
 
-        ),
-
-        actions=actions,
-
-        recommendation_charts=(
-            recommendation_charts
-        ),
-
-        warnings=warnings
+        actions=actions
 
     )
 

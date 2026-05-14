@@ -3,8 +3,13 @@
 import sqlite3
 
 from app.config import DB_NAME
+from app.config import (
+    DB_NAME,
+    START_CAPITAL
+)
 
-SCHEMA_VERSION = "1.3"
+SCHEMA_VERSION = "1.4"
+
 
 # =====================================
 # INIT DATABASE
@@ -163,6 +168,8 @@ def init_db():
 
         id INTEGER PRIMARY KEY CHECK (id = 1),
 
+        starting_capital REAL,
+
         current_equity REAL,
 
         current_cash REAL,
@@ -209,6 +216,7 @@ def init_db():
     )
 
     """)
+
     # =====================================
     # POSITION LOTS
     # =====================================
@@ -256,43 +264,66 @@ def init_db():
     )
 
     """)
+
     # =====================================
     # INSERT DEFAULT SYSTEM STATE
     # =====================================
-    cur.execute("""
+    cur.execute(
 
-    INSERT OR IGNORE INTO system_state (
+        """
 
-        id,
-        current_equity,
-        current_cash,
-        market_regime,
-        current_leader,
-        next_rebalance_date,
-        last_rebalance_date
+        INSERT OR IGNORE INTO system_state (
+
+            id,
+            starting_capital,
+            current_equity,
+            current_cash,
+            market_regime,
+            current_leader,
+            next_rebalance_date,
+            last_rebalance_date
+
+        )
+
+        VALUES (
+
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?
+
+        )
+
+        """,
+
+        (
+
+            1,
+            START_CAPITAL,
+            START_CAPITAL,
+            START_CAPITAL,
+            'UNKNOWN',
+            '',
+            '',
+            ''
+
+        )
 
     )
-
-    VALUES (
-
-        1,
-        0,
-        0,
-        'UNKNOWN',
-        '',
-        '',
-        ''
-
-    )
-
-    """)
 
     conn.commit()
 
     conn.close()
 
     print(
-        "✅ Database initialized successfully"
+
+        f"✅ Database initialized successfully "
+        f"(Schema v{SCHEMA_VERSION})"
+
     )
 
 
