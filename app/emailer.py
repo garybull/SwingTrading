@@ -393,9 +393,85 @@ def build_email_html(data):
 
     return html
 
-
 # =====================================
-# SEND EMAIL
+# GENERIC EMAIL SENDER
+# =====================================
+def send_email(
+    subject,
+    body
+):
+
+    if not ENABLE_EMAILS:
+
+        logger.warning(
+            "⚠️ Emails disabled"
+        )
+
+        return
+
+    msg = MIMEMultipart()
+
+    msg["Subject"] = subject
+
+    msg["From"] = EMAIL_ADDRESS
+
+    msg["To"] = TO_EMAIL
+
+    msg.attach(
+
+        MIMEText(
+            body,
+            "plain"
+        )
+
+    )
+
+    try:
+
+        logger.info(
+            f"Sending email: {subject}"
+        )
+
+        server = smtplib.SMTP(
+
+            SMTP_SERVER,
+            SMTP_PORT
+
+        )
+
+        server.starttls()
+
+        server.login(
+
+            EMAIL_ADDRESS,
+            EMAIL_PASSWORD
+
+        )
+
+        server.sendmail(
+
+            EMAIL_ADDRESS,
+
+            TO_EMAIL,
+
+            msg.as_string()
+
+        )
+
+        server.quit()
+
+        logger.info(
+            "✅ Alert email sent"
+        )
+
+    except Exception as e:
+
+        logger.error(
+            f"❌ Alert email failed: {e}"
+        )
+        
+# =====================================
+# SEND Daily EMAIL
 # =====================================
 def send_daily_email():
 
