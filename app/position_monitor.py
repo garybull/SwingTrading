@@ -212,14 +212,15 @@ def calculate_levels(
         # FIXED LEVELS
         # BASED ON ENTRY
         # ==============================
-        stop_price = round(
+        stop_price = 999999
+        # stop_price = round(
 
-            entry_price
-            - (2 * atr),
+        #     entry_price
+        #     - (2 * atr),
 
-            2
+        #     2
 
-        )
+        # )
 
         target_price = round(
 
