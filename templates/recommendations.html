@@ -107,7 +107,7 @@ RECOMMENDED PORTFOLIO
 
             <tbody>
 
-                {% for r in recommended_portfolio %}
+                {% for c in actions %}
 
                 <tr>
 
@@ -117,20 +117,20 @@ RECOMMENDED PORTFOLIO
                             color:white;
                             font-size:16px;
                         ">
-                            {{ r.symbol }}
+                            {{ c.symbol }}
                         </strong>
 
                     </td>
 
                     <td>
 
-                        {% if r.action == "BUY" %}
+                        {% if c.action == "BUY" %}
 
                         <span class="positive">
                             BUY
                         </span>
 
-                        {% elif r.action == "SELL" %}
+                        {% elif c.action == "SELL" %}
 
                         <span class="negative">
                             SELL
@@ -149,7 +149,7 @@ RECOMMENDED PORTFOLIO
                     <td>
 
                         {{ "%.1f"|format(
-                        r.target_allocation * 100
+                        c.target_allocation * 100
                         ) }}%
 
                     </td>
@@ -157,7 +157,7 @@ RECOMMENDED PORTFOLIO
                     <td>
 
                         {{ "%.2f"|format(
-                        r.score
+                        c.score
                         ) }}
 
                     </td>
@@ -165,7 +165,7 @@ RECOMMENDED PORTFOLIO
                     <td>
 
                         ${{ "%.2f"|format(
-                        r.current_price
+                        c.current_price
                         ) }}
 
                     </td>
@@ -173,7 +173,7 @@ RECOMMENDED PORTFOLIO
                     <td>
 
                         ${{ "{:,.0f}".format(
-                        r.position_size
+                        c.position_size
                         ) }}
 
                     </td>
@@ -183,7 +183,7 @@ RECOMMENDED PORTFOLIO
                         <strong style="
                             color:white;
                         ">
-                            {{ r.recommended_shares }}
+                            {{ c.recommended_shares }}
                         </strong>
 
                     </td>
@@ -278,74 +278,6 @@ CURRENT POSITIONS
 </div>
 
 <!-- =====================================
-MOMENTUM RANKINGS
-===================================== -->
-
-<div class="card">
-
-    <h2>
-        Momentum Rankings
-    </h2>
-
-    <div class="chart-container">
-
-        <table>
-
-            <thead>
-
-                <tr>
-
-                    <th>Rank</th>
-                    <th>Symbol</th>
-                    <th>Score</th>
-
-                </tr>
-
-            </thead>
-
-            <tbody>
-
-                {% for r in momentum_rankings %}
-
-                <tr>
-
-                    <td>
-
-                        {{ r.rank }}
-
-                    </td>
-
-                    <td>
-
-                        <strong style="
-                            color:white;
-                        ">
-                            {{ r.symbol }}
-                        </strong>
-
-                    </td>
-
-                    <td>
-
-                        {{ "%.2f"|format(
-                        r.score
-                        ) }}
-
-                    </td>
-
-                </tr>
-
-                {% endfor %}
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-</div>
-
-<!-- =====================================
 ACTION PLAN + CHARTS
 ===================================== -->
 
@@ -396,7 +328,9 @@ ACTION PLAN + CHARTS
                 <div class="metric" style="
                     font-size:30px;
                 ">
-                    ${{ c.current_price }}
+                    ${{ "%.2f"|format(
+                    c.current_price
+                    ) }}
                 </div>
 
             </div>
@@ -410,7 +344,9 @@ ACTION PLAN + CHARTS
                 <div class="metric negative" style="
                     font-size:30px;
                 ">
-                    ${{ c.stop }}
+                    ${{ "%.2f"|format(
+                    c.stop
+                    ) }}
                 </div>
 
             </div>
@@ -424,7 +360,9 @@ ACTION PLAN + CHARTS
                 <div class="metric positive" style="
                     font-size:30px;
                 ">
-                    ${{ c.target_1 }}
+                    ${{ "%.2f"|format(
+                    c.target_1
+                    ) }}
                 </div>
 
             </div>
@@ -451,7 +389,9 @@ ACTION PLAN + CHARTS
 
             <div class="metric negative">
 
-                {{ c.risk_pct }}%
+                {{ "%.1f"|format(
+                c.risk_pct
+                ) }}%
 
             </div>
 
@@ -467,7 +407,9 @@ ACTION PLAN + CHARTS
 
             <div class="metric positive">
 
-                {{ c.reward_pct }}%
+                {{ "%.1f"|format(
+                c.reward_pct
+                ) }}%
 
             </div>
 
@@ -483,7 +425,9 @@ ACTION PLAN + CHARTS
 
             <div class="metric">
 
-                {{ c.rr_ratio }}R
+                {{ "%.2f"|format(
+                c.rr_ratio
+                ) }}R
 
             </div>
 
@@ -495,6 +439,8 @@ ACTION PLAN + CHARTS
     CHART
     ===================================== -->
 
+    {% if c.chart %}
+
     <div id="chart_{{ c.symbol }}" style="
             width:100%;
             height:700px;
@@ -502,30 +448,32 @@ ACTION PLAN + CHARTS
             overflow:hidden;
         "></div>
 
-</div>
+    <script>
 
-<script>
-
-    let chart_{{ c.symbol }} = JSON.parse(
+        let chart_{{ c.symbol }} = JSON.parse(
             '{{ c.chart | safe }}'
         );
 
-    Plotly.newPlot(
+        Plotly.newPlot(
 
-        'chart_{{ c.symbol }}',
+            'chart_{{ c.symbol }}',
 
-        chart_{{ c.symbol }}.data,
+            chart_{{ c.symbol }}.data,
 
-        chart_{{ c.symbol }}.layout,
+            chart_{{ c.symbol }}.layout,
 
-        {
-            responsive: true,
-            scrollZoom: true
-        }
+            {
+                responsive: true,
+                scrollZoom: true
+            }
 
-    );
+        );
 
-</script>
+    </script>
+
+    {% endif %}
+
+</div>
 
 {% endfor %}
 

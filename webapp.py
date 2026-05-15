@@ -4,12 +4,14 @@ import sqlite3
 import json
 import plotly.graph_objs as go
 import plotly.utils
-import yfinance as yf
 from app.trading_cycle import (
     run_trading_cycle
 )
-from app.dashboard_service import (
-    build_dashboard_data
+from app.pnl_engine import (
+    get_pnl_summary
+)
+from app.portfolio import (
+    get_dashboard_data
 )
 from app.portfolio_state import refresh_system_state
 from app.recommendation_service import (
@@ -18,10 +20,10 @@ from app.recommendation_service import (
 from app.chart_engine import (
     build_recommendation_chart
 )
-
-from app.recommendation_engine import (
-    build_action_plan
+from app.pnl_engine import (
+    get_pnl_summary
 )
+
 from flask import (
 
     Flask,
@@ -115,44 +117,42 @@ def dashboard():
         "Loading dashboard..."
     )
 
-    dashboard_data = (
-        build_dashboard_data()
-    )
+    data = get_dashboard_data()
 
     return render_template(
 
         "dashboard.html",
 
-        positions=dashboard_data[
-            "positions"
-        ],
+        positions=data["positions"],
 
-        equity=dashboard_data[
-            "equity"
-        ],
+        rankings=data["rankings"],
 
-        cash=dashboard_data[
-            "cash"
-        ],
+        rebalance_history=
+            data["rebalance_history"],
 
-        total_equity=dashboard_data[
-            "total_equity"
-        ],
+        executed_trades=
+            data["executed_trades"],
 
-        total_return_pct=
-            dashboard_data[
-                "total_return_pct"
-            ],
+        recommended_portfolio=
+            data["recommended_portfolio"],
+
+        equity_curve=
+            data["equity_curve"],
 
         system_state=
-            dashboard_data[
-                "system_state"
-            ],
+            data["system_state"],
 
-        recent_rebalances=
-            dashboard_data[
-                "recent_rebalances"
-            ]
+        performance=
+            data["performance"],
+
+        drawdown=
+            data["drawdown"],
+
+        latest_rebalance=
+            data["latest_rebalance"],
+
+        pnl_summary=
+            data["pnl_summary"]
 
     )
 
@@ -177,6 +177,77 @@ def run_scan_route():
             "recommendations"
         )
     )
+
+# =====================================
+# P/L ANALYTICS
+# =====================================
+@app.route("/pnl")
+
+def pnl():
+
+    pnl_data = get_pnl_summary()
+
+    return render_template(
+
+        "pnl.html",
+
+        unrealized_positions=
+            pnl_data[
+                "unrealized_positions"
+            ].to_dict("records"),
+
+        total_unrealized=
+            pnl_data[
+                "total_unrealized"
+            ],
+
+        realized_trades=
+            pnl_data[
+                "realized_trades"
+            ].to_dict("records"),
+
+        total_realized=
+            pnl_data[
+                "total_realized"
+            ]
+
+    )
+
+# =====================================
+# P/L ANALYTICS
+# =====================================
+@app.route("/pnl-analytics")
+
+def pnl_analytics():
+
+    pnl_data = get_pnl_summary()
+
+    return render_template(
+
+        "pnl.html",
+
+        unrealized_positions=
+            pnl_data[
+                "unrealized_positions"
+            ].to_dict("records"),
+
+        total_unrealized=
+            pnl_data[
+                "total_unrealized"
+            ],
+
+        realized_trades=
+            pnl_data[
+                "realized_trades"
+            ].to_dict("records"),
+
+        total_realized=
+            pnl_data[
+                "total_realized"
+            ]
+
+    )
+ 
 
 # =====================================
 # BENCHMARKS
@@ -356,6 +427,32 @@ def benchmarks():
 
     )
 
+
+# =====================================
+# Recommendations
+# =====================================
+@app.route("/recommendations")
+def recommendations():
+
+    logger.info(
+        "Loading recommendations page..."
+    )
+
+    page_data = (
+        build_recommendations_page()
+    )
+
+    return render_template(
+
+        "recommendations.html",
+
+        actions=
+            page_data["actions"],
+
+        positions=
+            page_data["positions"]
+
+    )
 
 # =====================================
 # TRADE ENTRY PAGE

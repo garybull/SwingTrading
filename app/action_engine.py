@@ -1,8 +1,11 @@
 # app/action_engine.py
 
 import pandas as pd
-
+from app.config import (START_CAPITAL)
 from app.logger import logger
+from app.db_service import (
+    query_df
+)
 
 
 # =====================================
@@ -40,6 +43,8 @@ def build_action_plan(
     # =====================================
     current_map = {}
 
+    total_equity = 0
+
     if current_positions is not None:
 
         if len(current_positions) > 0:
@@ -53,6 +58,44 @@ def build_action_plan(
                 in current_positions.iterrows()
 
             }
+
+            # =====================================
+            # TOTAL EQUITY
+            # =====================================
+            # =====================================
+            # LOAD TOTAL SYSTEM EQUITY
+            # =====================================
+            state = query_df("""
+
+                SELECT
+                    current_equity
+
+                FROM system_state
+
+                WHERE id = 1
+
+            """)
+
+            if not state.empty:
+
+                total_equity = float(
+
+                    state.iloc[0][
+                        "current_equity"
+                    ]
+
+                )
+
+            else:
+
+                total_equity = START_CAPITAL
+
+    # =====================================
+    # FALLBACK
+    # =====================================
+    if total_equity <= 0:
+
+        total_equity = START_CAPITAL
 
     # =====================================
     # BUILD TARGET ACTIONS
@@ -74,24 +117,6 @@ def build_action_plan(
 
             row.get(
                 "current_price",
-                0
-            )
-
-        )
-
-        target_value = float(
-
-            row.get(
-                "target_value",
-                0
-            )
-
-        )
-
-        recommended_shares = int(
-
-            row.get(
-                "recommended_shares",
                 0
             )
 
@@ -133,16 +158,27 @@ def build_action_plan(
 
             )
 
+            current_market_value = float(
+
+                current_row.get(
+                    "market_value",
+                    0
+                )
+
+            )
+
         else:
 
             current_shares = 0
 
             current_allocation = 0
 
+            current_market_value = 0
+
         # =====================================
-        # ALLOCATION DIFFERENCE
+        # REQUIRED REBALANCE DELTA
         # =====================================
-        diff = abs(
+        allocation_delta = (
 
             target_allocation
 
@@ -151,19 +187,60 @@ def build_action_plan(
         )
 
         # =====================================
-        # SKIP SMALL CHANGES
+        # ACTION TYPE
         # =====================================
-        if diff < threshold:
+        if abs(allocation_delta) < threshold:
 
             action = "HOLD"
 
-        elif target_allocation > current_allocation:
+        elif allocation_delta > 0:
 
             action = "BUY"
 
         else:
 
             action = "SELL"
+
+        # =====================================
+        # REQUIRED POSITION VALUE
+        # =====================================
+        # =====================================
+        # TARGET POSITION VALUE
+        # =====================================
+        target_position_value = (
+
+            total_equity
+
+            * target_allocation
+
+        )
+
+        # =====================================
+        # REQUIRED TRADE VALUE
+        # =====================================
+        required_value = abs(
+
+            target_position_value
+
+            - current_market_value
+
+        )
+
+        # =====================================
+        # REQUIRED SHARES
+        # =====================================
+        required_shares = 0
+
+        if current_price > 0:
+
+            required_shares = int(
+
+                required_value
+
+                / current_price
+
+            )
+
 
         # =====================================
         # RISK MODEL
@@ -248,17 +325,28 @@ def build_action_plan(
             "current_allocation":
                 current_allocation,
 
+            "allocation_delta":
+                allocation_delta,
+
             "current_price":
                 current_price,
 
+            # FINAL TARGET POSITION
+            "target_position_value":
+                target_position_value,
+
+            # REQUIRED TRADE SIZE
             "position_size":
-                target_value,
+                required_value,
 
             "recommended_shares":
-                recommended_shares,
+                required_shares,
 
             "current_shares":
                 current_shares,
+
+            "current_market_value":
+                current_market_value,
 
             "entry_price":
                 current_price,

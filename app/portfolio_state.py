@@ -1,11 +1,14 @@
 # app/portfolio_state.py
 
-from app.logger import logger
+from datetime import datetime
+import pandas as pd
 
 from app.db_service import (
     query_df,
     execute
 )
+
+from app.logger import logger
 
 
 # =====================================
@@ -23,7 +26,9 @@ def refresh_system_state():
     positions = query_df("""
 
         SELECT
-
+            symbol,
+            shares,
+            current_price,
             market_value
 
         FROM positions
@@ -31,8 +36,10 @@ def refresh_system_state():
     """)
 
     # =====================================
-    # TOTAL MARKET VALUE
+    # MARKET VALUE
     # =====================================
+    total_market_value = 0
+
     if not positions.empty:
 
         total_market_value = float(
@@ -43,18 +50,14 @@ def refresh_system_state():
 
         )
 
-    else:
-
-        total_market_value = 0
-
     # =====================================
     # LOAD CASH
     # =====================================
     state = query_df("""
 
         SELECT
-
-            current_cash
+            current_cash,
+            starting_capital
 
         FROM system_state
 
@@ -62,27 +65,40 @@ def refresh_system_state():
 
     """)
 
-    if not state.empty:
+    # =====================================
+    # EMPTY SAFETY
+    # =====================================
+    if state.empty:
 
-        cash = float(
-
-            state.iloc[0][
-                "current_cash"
-            ]
-
+        logger.warning(
+            "No system_state row found"
         )
 
-    else:
+        return 0
 
-        cash = 0
+    cash = float(
+
+        state.iloc[0][
+            "current_cash"
+        ]
+
+    )
+
+    starting_capital = float(
+
+        state.iloc[0][
+            "starting_capital"
+        ]
+
+    )
 
     # =====================================
     # TOTAL EQUITY
     # =====================================
     equity = (
 
-        total_market_value
-        + cash
+        cash
+        + total_market_value
 
     )
 
@@ -93,7 +109,8 @@ def refresh_system_state():
 
         UPDATE system_state
 
-        SET current_equity = ?
+        SET
+            current_equity = ?
 
         WHERE id = 1
 
@@ -103,11 +120,116 @@ def refresh_system_state():
 
     ))
 
+    # =====================================
+    # UPDATE POSITION ALLOCATIONS
+    # =====================================
+    if not positions.empty and equity > 0:
+
+        for _, row in positions.iterrows():
+
+            symbol = row["symbol"]
+
+            market_value = float(
+                row["market_value"]
+            )
+
+            allocation_pct = (
+
+                market_value
+                / equity
+
+            )
+
+            execute("""
+
+                UPDATE positions
+
+                SET allocation_pct = ?
+
+                WHERE symbol = ?
+
+            """, (
+
+                allocation_pct,
+
+                symbol
+
+            ))
+
+    # =====================================
+    # SAVE EQUITY SNAPSHOT
+    # =====================================
+    today = datetime.now().strftime(
+        "%Y-%m-%d"
+    )
+
+    # Remove duplicate daily snapshot
+    execute("""
+
+        DELETE FROM portfolio_history
+
+        WHERE date = ?
+
+    """, (
+
+        today,
+
+    ))
+
+    execute("""
+
+        INSERT INTO portfolio_history (
+
+            date,
+            equity,
+            cash,
+            market_value
+
+        )
+
+        VALUES (?, ?, ?, ?)
+
+    """, (
+
+        today,
+
+        equity,
+
+        cash,
+
+        total_market_value
+
+    ))
+
     logger.info(
 
-        f"System equity updated: "
-        f"${equity:,.2f}"
+        f"System state refreshed | "
+        f"Equity=${equity:,.2f} | "
+        f"Cash=${cash:,.2f} | "
+        f"Market Value=${total_market_value:,.2f}"
 
     )
 
-    return equity
+    return {
+
+        "equity":
+            equity,
+
+        "cash":
+            cash,
+
+        "market_value":
+            total_market_value,
+
+        "starting_capital":
+            starting_capital
+
+    }
+
+
+# =====================================
+# RUN
+# =====================================
+if __name__ == "__main__":
+
+    refresh_system_state()

@@ -17,8 +17,6 @@ from app.db_service import (
 # =====================================
 def get_live_portfolio():
 
-    conn = get_connection()
-
     positions = query_df("""
 
         SELECT *
@@ -36,8 +34,6 @@ def get_live_portfolio():
         LIMIT 1
 
     """)
-
-    conn.close()
 
     # =====================================
     # EMPTY SAFETY
@@ -203,6 +199,14 @@ def get_live_portfolio():
             / total_equity
 
         )
+        # =====================================
+        # PERCENT FORMAT
+        # =====================================
+        positions_df[
+            "allocation_pct"
+        ] = positions_df[
+            "allocation_pct"
+        ].astype(float)
 
     else:
 

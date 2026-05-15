@@ -1,18 +1,20 @@
 # production/log_trade.py
 
 from datetime import datetime
-import sqlite3
 
-from app.config import DB_NAME
+from app.db_service import (
+    execute_query
+)
+
 from app.logger import logger
 
+from app.reconciliation import (
+    rebuild_positions_from_trades
+)
 
-# =====================================
-# DB CONNECTION
-# =====================================
-def get_connection():
-
-    return sqlite3.connect(DB_NAME)
+from app.portfolio_state import (
+    refresh_system_state
+)
 
 
 # =====================================
@@ -28,13 +30,12 @@ def log_trade(
 
 ):
 
-    conn = get_connection()
-
-    cur = conn.cursor()
-
     today = str(
         datetime.now().date()
     )
+
+    symbol = symbol.upper()
+    side = side.upper()
 
     total_value = (
         shares * fill_price
@@ -43,7 +44,7 @@ def log_trade(
     # =====================================
     # SAVE TRADE
     # =====================================
-    cur.execute("""
+    execute_query("""
 
         INSERT INTO executed_trades (
 
@@ -63,9 +64,9 @@ def log_trade(
 
         today,
 
-        symbol.upper(),
+        symbol,
 
-        side.upper(),
+        side,
 
         shares,
 
@@ -77,29 +78,51 @@ def log_trade(
 
     ))
 
-    conn.commit()
-
-    conn.close()
-
     logger.info(
 
         f"TRADE LOGGED | "
-        f"{side.upper()} "
+        f"{side} "
         f"{shares} "
-        f"{symbol.upper()} @ "
+        f"{symbol} @ "
         f"${fill_price:.2f}"
 
     )
+
+    # =====================================
+    # REBUILD POSITIONS
+    # =====================================
+    logger.info(
+        "Rebuilding positions..."
+    )
+
+    rebuild_positions_from_trades()
+
+    # =====================================
+    # REFRESH SYSTEM STATE
+    # =====================================
+    logger.info(
+        "Refreshing system state..."
+    )
+
+    refresh_system_state()
 
     print("\n✅ TRADE LOGGED")
 
     print(
 
-        f"{side.upper()} "
+        f"{side} "
         f"{shares} "
-        f"{symbol.upper()} @ "
+        f"{symbol} @ "
         f"${fill_price:.2f}"
 
+    )
+
+    print(
+        "\n✅ POSITIONS UPDATED"
+    )
+
+    print(
+        "✅ SYSTEM STATE REFRESHED"
     )
 
 
@@ -108,7 +131,9 @@ def log_trade(
 # =====================================
 if __name__ == "__main__":
 
-    print("\n🚀 MANUAL TRADE LOGGER\n")
+    print(
+        "\n🚀 MANUAL TRADE LOGGER\n"
+    )
 
     symbol = input(
         "Symbol: "

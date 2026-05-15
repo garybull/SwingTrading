@@ -51,28 +51,6 @@ def init_db():
 
     """)
 
-    # =====================================
-    # PORTFOLIO HISTORY
-    # =====================================
-    cur.execute("""
-
-    CREATE TABLE IF NOT EXISTS portfolio_history (
-
-        date TEXT PRIMARY KEY,
-
-        equity REAL,
-
-        cash REAL,
-
-        drawdown REAL,
-
-        positions_json TEXT,
-
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-    )
-
-    """)
 
     # =====================================
     # REBALANCE LOG
@@ -273,6 +251,41 @@ def init_db():
 
     """)
 
+     # =====================================
+    # PORTFOLIO HISTORY
+    # =====================================
+    cur.execute("""
+
+        CREATE TABLE IF NOT EXISTS portfolio_history (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            date TEXT NOT NULL,
+
+            equity REAL NOT NULL,
+
+            cash REAL NOT NULL,
+
+            market_value REAL NOT NULL,
+
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+        )
+
+    """)
+
+    # =====================================
+    # PORTFOLIO HISTORY INDEX
+    # =====================================
+    cur.execute("""
+
+        CREATE INDEX IF NOT EXISTS idx_portfolio_history_date
+
+        ON portfolio_history(date)
+
+    """)
+
+
     # =====================================
     # INSERT DEFAULT SYSTEM STATE
     # =====================================
@@ -333,8 +346,6 @@ def init_db():
         f"(Schema v{SCHEMA_VERSION})"
 
     )
-
-
 # =====================================
 # RUN
 # =====================================

@@ -45,6 +45,31 @@ def rebuild_positions_from_trades():
             "No executed trades found"
         )
 
+        # =====================================
+        # RESET POSITIONS
+        # =====================================
+        execute("""
+
+            DELETE FROM positions
+
+        """)
+
+        execute("""
+
+            UPDATE system_state
+
+            SET current_cash = ?,
+                current_equity = ?
+
+            WHERE id = 1
+
+        """, (
+
+            START_CAPITAL,
+            START_CAPITAL
+
+        ))
+
         return {
 
             "positions": {},
@@ -164,8 +189,12 @@ def rebuild_positions_from_trades():
     """)
 
     # =====================================
-    # REBUILD POSITIONS TABLE
+    # BUILD OPEN POSITIONS
     # =====================================
+    open_positions = []
+
+    total_market_value = 0
+
     for symbol, pos in positions.items():
 
         shares = int(
@@ -187,6 +216,55 @@ def rebuild_positions_from_trades():
             shares * avg_price
         )
 
+        allocation_pct = (
+
+            market_value
+
+            / START_CAPITAL
+
+        )
+
+        total_market_value += (
+            market_value
+        )
+
+        open_positions.append({
+
+            "symbol": symbol,
+
+            "shares": shares,
+
+            "avg_price": avg_price,
+
+            "market_value": market_value
+
+        })
+
+    # =====================================
+    # TOTAL EQUITY
+    # =====================================
+    total_equity = (
+        total_market_value
+        + cash
+    )
+
+    # =====================================
+    # INSERT POSITIONS
+    # =====================================
+    for pos in open_positions:
+
+        allocation_pct = 0
+
+        if total_equity > 0:
+
+            allocation_pct = (
+
+                pos["market_value"]
+
+                / total_equity
+
+            )
+
         execute("""
 
             INSERT INTO positions (
@@ -207,40 +285,42 @@ def rebuild_positions_from_trades():
 
         """, (
 
-            symbol,
+            pos["symbol"],
 
-            shares,
+            pos["shares"],
 
-            avg_price,
+            pos["avg_price"],
 
-            avg_price,
+            pos["avg_price"],
 
-            market_value,
+            pos["market_value"],
 
-            0,
-
-            0,
+            allocation_pct,
 
             0,
+
 
             ""
 
         ))
 
     # =====================================
-    # UPDATE CASH
+    # UPDATE SYSTEM STATE
     # =====================================
     execute("""
 
         UPDATE system_state
 
-        SET current_cash = ?
+        SET
+            current_cash = ?,
+            current_equity = ?
 
         WHERE id = 1
 
     """, (
 
         cash,
+        total_equity
 
     ))
 
@@ -257,8 +337,15 @@ def rebuild_positions_from_trades():
 
     logger.info(
 
+        f"Total equity rebuilt to "
+        f"${total_equity:,.2f}"
+
+    )
+
+    logger.info(
+
         f"Open positions rebuilt: "
-        f"{len(positions)}"
+        f"{len(open_positions)}"
 
     )
 
@@ -268,6 +355,9 @@ def rebuild_positions_from_trades():
             positions,
 
         "cash":
-            cash
+            cash,
+
+        "equity":
+            total_equity
 
     }

@@ -20,7 +20,7 @@ REBALANCE_DAYS = 10
 
 REBALANCE_OFFSET = 0
 
-CASH_RESERVE = 0.85
+CASH_RESERVE = 0.15
 
 SLIPPAGE = 0.001
 
@@ -82,3 +82,9 @@ ENABLE_EMAILS = True
 ENABLE_REBALANCE_LOGGING = True
 
 ENABLE_MARKET_FILTER = True
+
+# =====================================
+# EXECUTION MODE
+# =====================================
+AUTO_EXECUTE = False
+SEND_SUMMARY_EMAIL = True

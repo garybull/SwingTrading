@@ -19,7 +19,7 @@ from app.portfolio_state import (
 from app.emailer import (
     send_email
 )
- from app.config import (
+from app.config import (
     AUTO_EXECUTE,
     SEND_SUMMARY_EMAIL
  )

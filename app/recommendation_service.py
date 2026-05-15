@@ -1,9 +1,5 @@
 # app/recommendation_service.py
-import pandas as pd
 
-from app.config import (
-    DB_NAME
-)
 from app.db_service import (
     query_df
 )
@@ -17,7 +13,9 @@ from app.action_engine import (
 from app.chart_engine import (
     build_recommendation_chart
 )
-
+from app.live_portfolio import (
+    get_live_portfolio
+)
 # =====================================
 # LOAD POSITIONS
 # =====================================
@@ -66,7 +64,15 @@ def build_recommendations_page():
         load_recommended_portfolio()
     )
 
-    positions = load_positions()
+    live_portfolio = (
+        get_live_portfolio()
+    )
+
+    positions = (
+        live_portfolio[
+            "positions"
+        ]
+    )
 
     # =====================================
     # BUILD ACTIONS
@@ -93,38 +99,142 @@ def build_recommendations_page():
 
         try:
 
+            symbol = action[
+                "symbol"
+            ]
+
             logger.info(
 
                 f"Building chart for "
-                f"{action['symbol']}"
+                f"{symbol}"
 
             )
 
-            action["chart"] = (
-
+            chart_data = (
                 build_recommendation_chart(
+                    symbol
+                )
+            )
 
-                    symbol=action[
-                        "symbol"
-                    ],
+            # =====================================
+            # EMBED CHART
+            # =====================================
+            action["chart"] = (
+                chart_data["chart"]
+            )
 
-                    entry=action[
-                        "entry_price"
-                    ],
+            # =====================================
+            # OPTIONAL OVERRIDES
+            # =====================================
+            action["entry_price"] = (
 
-                    stop=action[
-                        "stop"
-                    ],
+                chart_data.get(
 
-                    target_1=action[
-                        "target_1"
-                    ],
+                    "entry",
 
-                    target_2=action[
-                        "target_2"
-                    ]
+                    action.get(
+                        "entry_price",
+                        0
+                    )
 
                 )
+
+            )
+
+            action["stop"] = (
+
+                chart_data.get(
+
+                    "stop",
+
+                    action.get(
+                        "stop",
+                        0
+                    )
+
+                )
+
+            )
+
+            action["target_1"] = (
+
+                chart_data.get(
+
+                    "target_1",
+
+                    action.get(
+                        "target_1",
+                        0
+                    )
+
+                )
+
+            )
+
+            action["target_2"] = (
+
+                chart_data.get(
+
+                    "target_2",
+
+                    action.get(
+                        "target_2",
+                        0
+                    )
+
+                )
+
+            )
+
+            action["risk_pct"] = (
+
+                chart_data.get(
+
+                    "risk_pct",
+
+                    action.get(
+                        "risk_pct",
+                        0
+                    )
+
+                )
+
+            )
+
+            action["reward_pct"] = (
+
+                chart_data.get(
+
+                    "reward_pct",
+
+                    action.get(
+                        "reward_pct",
+                        0
+                    )
+
+                )
+
+            )
+
+            action["rr_ratio"] = (
+
+                chart_data.get(
+
+                    "rr_ratio",
+
+                    action.get(
+                        "rr_ratio",
+                        0
+                    )
+
+                )
+
+            )
+
+            logger.info(
+
+                f"Chart complete for "
+                f"{symbol}"
 
             )
 
@@ -145,6 +255,12 @@ def build_recommendations_page():
 
     return {
 
-        "actions": actions
+        "actions":
+            actions,
+
+        "positions":
+            positions.to_dict(
+                "records"
+            )
 
     }

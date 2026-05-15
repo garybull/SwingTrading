@@ -150,7 +150,17 @@ def get_system_curve():
             "No equity curve found"
         )
 
-        return pd.DataFrame()
+        return pd.DataFrame(
+
+            columns=[
+
+                "date",
+                "equity",
+                "normalized"
+
+            ]
+
+        )
 
     equity_curve = (
         equity_curve.copy()
@@ -245,12 +255,18 @@ def get_benchmark_curves():
         # =====================================
         # CLOSE SERIES
         # =====================================
-        close = (
-            df["Close"]
-            .dropna()
-        )
+        close = df["Close"]
 
-        if len(close) == 0:
+        # =====================================
+        # HANDLE DATAFRAME VS SERIES
+        # =====================================
+        if isinstance(close, pd.DataFrame):
+
+            close = close.iloc[:, 0]
+
+        close = close.dropna()
+
+        if close.empty:
 
             continue
 
@@ -397,7 +413,19 @@ def get_benchmark_report():
         get_benchmark_curves()
     )
 
-    report = {}
+    report = {
+
+        "SYSTEM": {
+
+            "final_equity": 0,
+            "cagr": 0,
+            "max_drawdown": 0,
+            "sharpe": 0,
+            "sortino": 0
+
+        }
+
+    }
 
     # =====================================
     # SYSTEM METRICS

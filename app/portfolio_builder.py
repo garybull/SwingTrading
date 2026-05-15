@@ -63,19 +63,65 @@ def build_target_portfolio():
     ).copy()
 
     # =====================================
-    # ALLOCATION MODEL
+    # VOLATILITY-WEIGHTED
+    # MATCH BACKTEST LOGIC
     # =====================================
-    allocation_per_asset = (
+    selected[
+        "inverse_volatility"
+    ] = (
 
-        CASH_RESERVE
-
-        / len(selected)
+        1 / selected[
+            "volatility"
+        ]
 
     )
 
+    total_inverse_vol = (
+        selected[
+            "inverse_volatility"
+        ].sum()
+    )
+
+    # =====================================
+    # SAFETY
+    # =====================================
+    if total_inverse_vol <= 0:
+
+        logger.warning(
+            "Invalid volatility values"
+        )
+
+        return pd.DataFrame()
+
+    # =====================================
+    # WEIGHTS
+    # =====================================
+    selected[
+        "weight"
+    ] = (
+
+        selected[
+            "inverse_volatility"
+        ]
+
+        / total_inverse_vol
+
+    )
+
+    # =====================================
+    # TARGET ALLOCATION
+    # MATCH BACKTEST:
+    # capital * weight * (1 - CASH_RESERVE)
+    # =====================================
     selected[
         "target_allocation"
-    ] = allocation_per_asset
+    ] = (
+
+        selected["weight"]
+
+        * (1 - CASH_RESERVE)
+
+    )
 
     # =====================================
     # ACTION LABEL
@@ -119,6 +165,13 @@ def build_target_portfolio():
 
         f"Built target portfolio "
         f"with {len(selected)} assets"
+
+    )
+
+    logger.info(
+
+        f"Total target allocation: "
+        f"{round(selected['target_allocation'].sum() * 100, 2)}%"
 
     )
 
