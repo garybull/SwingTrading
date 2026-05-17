@@ -16,6 +16,14 @@ from app.db_service import (
     query_df
 )
 
+from app.risk_engine import (
+    get_risk_report
+)
+
+risk_report = (
+    get_risk_report()
+)
+
 
 # =====================================
 # SYSTEM STATE
@@ -216,13 +224,35 @@ def calculate_performance(equity_curve):
 
         }
 
-    total_days = len(equity_curve)
+    # =====================================
+    # CAGR
+    # =====================================
+    equity_curve["date"] = pd.to_datetime(
+        equity_curve["date"]
+    )
 
-    years = total_days / 252
+    start_date = equity_curve[
+        "date"
+    ].min()
 
-    if years <= 0:
+    end_date = equity_curve[
+        "date"
+    ].max()
 
-        cagr = 0
+    total_days = (
+
+        end_date
+        - start_date
+
+    ).days
+
+    years = total_days / 365.25
+    # =====================================
+    # NOT ENOUGH HISTORY
+    # =====================================
+    if years < 0.15:
+
+        cagr = None
 
     else:
 
@@ -236,6 +266,7 @@ def calculate_performance(equity_curve):
             - 1
 
         ) * 100
+
 
     # =====================================
     # MAX DRAWDOWN
@@ -268,7 +299,13 @@ def calculate_performance(equity_curve):
 
     return {
 
-        "cagr": round(cagr, 2),
+        "cagr":
+
+            round(cagr, 2)
+
+            if cagr is not None
+
+            else None,
 
         "max_drawdown": round(
             abs(max_drawdown),
@@ -452,6 +489,9 @@ def get_dashboard_data():
             latest_rebalance,
 
         "pnl_summary":
-            pnl_summary
+            pnl_summary,
+            
+        "risk_report":
+            risk_report
 
     }

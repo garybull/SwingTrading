@@ -4,8 +4,37 @@ import sqlite3
 import json
 import plotly.graph_objs as go
 import plotly.utils
+from app.regime_engine import determine_market_regime
 from app.trading_cycle import (
     run_trading_cycle
+)
+from app.health_engine import (
+    get_health_report
+)
+from app.alert_engine import (
+    get_alert_report
+)
+from app.alert_history import (
+
+    load_alert_history,
+    get_alert_stats
+)
+from app.regime_engine import (
+
+    determine_market_regime,
+    get_suggested_exposure
+)
+from app.alert_engine import (
+    get_alert_report
+)
+from app.drawdown_engine import (
+    get_drawdown_report
+)
+from app.risk_engine import (
+    get_risk_report
+)
+from app.regime_service import (
+    load_latest_regime
 )
 from app.pnl_engine import (
     get_pnl_summary
@@ -119,6 +148,25 @@ def dashboard():
 
     data = get_dashboard_data()
 
+    regime = load_latest_regime()
+
+    risk_report = (
+        get_risk_report()
+    )
+    health_report = (
+        get_health_report()
+    )
+    drawdown_report = (
+        get_drawdown_report()
+    )
+    alert_report = (
+        get_alert_report()
+    )
+    suggested_exposure = (
+        get_suggested_exposure()
+    )
+
+
     return render_template(
 
         "dashboard.html",
@@ -152,10 +200,25 @@ def dashboard():
             data["latest_rebalance"],
 
         pnl_summary=
-            data["pnl_summary"]
+            data["pnl_summary"],
+
+        regime=
+            regime,
+
+        risk_report=
+            risk_report,
+
+        health_report=
+            health_report,
+
+        suggested_exposure=
+            suggested_exposure,
+        drawdown_report=
+            drawdown_report,
+        alert_report=
+            alert_report
 
     )
-
 
 # =====================================
 # RUN SCAN
@@ -214,6 +277,44 @@ def pnl():
     )
 
 # =====================================
+# ALERT CENTER
+# =====================================
+@app.route("/alerts")
+def alerts():
+
+    logger.info(
+        "Loading alerts dashboard..."
+    )
+
+    alert_report = (
+        get_alert_report()
+    )
+
+    alert_history = (
+        load_alert_history()
+    )
+
+    alert_stats = (
+        get_alert_stats()
+    )
+
+    return render_template(
+
+        "alerts.html",
+
+        alert_report=
+            alert_report,
+
+        alert_history=
+            alert_history,
+
+        alert_stats=
+            alert_stats
+
+    )
+
+
+# =====================================
 # P/L ANALYTICS
 # =====================================
 @app.route("/pnl-analytics")
@@ -256,59 +357,74 @@ def pnl_analytics():
 def benchmarks():
 
     from app.benchmark_engine import (
-        get_benchmark_report
+
+        get_benchmark_report,
+        get_system_curve,
+        get_benchmark_curves
+
     )
 
-    benchmark_data = (
+    # =====================================
+    # LOAD DATA
+    # =====================================
+    report = (
         get_benchmark_report()
     )
 
-    report = benchmark_data[
-        "report"
-    ]
+    system_curve = (
+        get_system_curve()
+    )
 
-    system_curve = benchmark_data[
-        "system_curve"
-    ]
-
-    benchmark_curves = benchmark_data[
-        "benchmark_curves"
-    ]
+    benchmark_curves = (
+        get_benchmark_curves()
+    )
 
     # =====================================
     # EQUITY CHART
     # =====================================
     equity_fig = go.Figure()
 
-    # SYSTEM
-    equity_fig.add_trace(
-
-        go.Scatter(
-
-            x=system_curve["date"],
-
-            y=system_curve[
-                "normalized"
-            ],
-
-            mode="lines",
-
-            name="SYSTEM"
-
-        )
-
-    )
-
-    # BENCHMARKS
-    for symbol, curve in benchmark_curves.items():
+    # =====================================
+    # SYSTEM CURVE
+    # =====================================
+    if not system_curve.empty:
 
         equity_fig.add_trace(
 
             go.Scatter(
 
-                x=curve.index,
+                x=system_curve["date"],
 
-                y=curve.values,
+                y=system_curve[
+                    "normalized"
+                ],
+
+                mode="lines",
+
+                name="SYSTEM"
+
+            )
+
+        )
+
+    # =====================================
+    # BENCHMARK CURVES
+    # =====================================
+    for symbol, curve in benchmark_curves.items():
+
+        if curve.empty:
+
+            continue
+
+        equity_fig.add_trace(
+
+            go.Scatter(
+
+                x=curve["date"],
+
+                y=curve[
+                    "normalized"
+                ],
 
                 mode="lines",
 
@@ -341,41 +457,17 @@ def benchmarks():
     # =====================================
     dd_fig = go.Figure()
 
-    # SYSTEM DD
-    system_dd = (
+    # =====================================
+    # SYSTEM DRAWDOWN
+    # =====================================
+    if not system_curve.empty:
 
-        system_curve["normalized"]
+        system_dd = (
 
-        / system_curve["normalized"]
-        .cummax()
+            system_curve["normalized"]
 
-        - 1
-
-    ) * 100
-
-    dd_fig.add_trace(
-
-        go.Scatter(
-
-            x=system_curve["date"],
-
-            y=system_dd,
-
-            mode="lines",
-
-            name="SYSTEM"
-
-        )
-
-    )
-
-    # BENCHMARK DDS
-    for symbol, curve in benchmark_curves.items():
-
-        dd = (
-
-            curve
-            / curve.cummax()
+            / system_curve["normalized"]
+            .cummax()
 
             - 1
 
@@ -385,9 +477,45 @@ def benchmarks():
 
             go.Scatter(
 
-                x=curve.index,
+                x=system_curve["date"],
 
-                y=dd.values,
+                y=system_dd,
+
+                mode="lines",
+
+                name="SYSTEM"
+
+            )
+
+        )
+
+    # =====================================
+    # BENCHMARK DRAWDOWNS
+    # =====================================
+    for symbol, curve in benchmark_curves.items():
+
+        if curve.empty:
+
+            continue
+
+        dd = (
+
+            curve["normalized"]
+
+            / curve["normalized"]
+            .cummax()
+
+            - 1
+
+        ) * 100
+
+        dd_fig.add_trace(
+
+            go.Scatter(
+
+                x=curve["date"],
+
+                y=dd,
 
                 mode="lines",
 
@@ -427,7 +555,6 @@ def benchmarks():
 
     )
 
-
 # =====================================
 # Recommendations
 # =====================================
@@ -441,7 +568,8 @@ def recommendations():
     page_data = (
         build_recommendations_page()
     )
-
+    regime=determine_market_regime()
+    
     return render_template(
 
         "recommendations.html",
@@ -451,6 +579,7 @@ def recommendations():
 
         positions=
             page_data["positions"]
+        
 
     )
 

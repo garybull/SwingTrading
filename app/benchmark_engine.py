@@ -2,15 +2,16 @@
 
 import pandas as pd
 import numpy as np
+import yfinance as yf
 
-from app.portfolio import (
-    get_equity_curve
+from app.config import (
+    START_CAPITAL
 )
 
 from app.logger import logger
 
-from app.market_data_service import (
-    get_historical_data
+from app.portfolio import (
+    get_equity_curve
 )
 
 
@@ -25,117 +26,193 @@ BENCHMARKS = [
 
 ]
 
-STARTING_CAPITAL = 100000
+
+# =====================================
+# LOAD BENCHMARK DATA
+# =====================================
+def load_benchmark_data(symbol):
+
+    logger.info(
+        f"Loading benchmark: {symbol}"
+    )
+
+    df = yf.download(
+
+        symbol,
+
+        period="10y",
+
+        auto_adjust=True,
+
+        progress=False
+
+    )
+
+    # =====================================
+    # EMPTY SAFETY
+    # =====================================
+    if df.empty:
+
+        logger.warning(
+            f"No benchmark data for "
+            f"{symbol}"
+        )
+
+        return pd.DataFrame()
+
+    return df
 
 
 # =====================================
-# CAGR
+# NORMALIZE EQUITY CURVE
 # =====================================
-def calculate_cagr(
+def normalize_curve(series):
 
-    starting_value,
+    if len(series) == 0:
 
-    ending_value,
+        return pd.Series()
 
-    years
-
-):
-
-    if years <= 0:
-
-        return 0
+    starting_value = float(
+        series.iloc[0]
+    )
 
     return (
 
-        (
-            ending_value
-            / starting_value
-        ) ** (1 / years)
+        series
+        / starting_value
 
-        - 1
-
-    ) * 100
+    ) * START_CAPITAL
 
 
 # =====================================
 # MAX DRAWDOWN
 # =====================================
-def calculate_max_drawdown(
-    series
-):
+def calculate_max_drawdown(series):
 
-    rolling_max = (
-        series.cummax()
-    )
+    if len(series) == 0:
+
+        return 0
+
+    running_max = series.cummax()
 
     drawdown = (
 
-        series
-        / rolling_max
+        (
+            series
+            - running_max
+        )
 
-        - 1
+        / running_max
+
+    ) * 100
+
+    return round(
+
+        abs(drawdown.min()),
+
+        2
 
     )
 
-    return abs(
-        drawdown.min()
+
+# =====================================
+# CAGR
+# =====================================
+def calculate_cagr(series):
+
+    if len(series) < 2:
+
+        return 0
+
+    start = float(
+        series.iloc[0]
+    )
+
+    end = float(
+        series.iloc[-1]
+    )
+
+    years = len(series) / 252
+
+    if years <= 0:
+
+        return 0
+
+    cagr = (
+
+        (
+            end / start
+        ) ** (
+
+            1 / years
+
+        ) - 1
+
     ) * 100
+
+    return round(cagr, 2)
 
 
 # =====================================
 # SHARPE
 # =====================================
-def calculate_sharpe(
-    returns
-):
+def calculate_sharpe(returns):
 
-    if returns.std() == 0:
+    if len(returns) < 2:
+
+        return 0
+
+    std = returns.std()
+
+    if std == 0:
 
         return 0
 
     sharpe = (
 
         returns.mean()
-        / returns.std()
+
+        / std
 
     ) * np.sqrt(252)
 
-    return sharpe
+    return round(sharpe, 2)
 
 
 # =====================================
 # SORTINO
 # =====================================
-def calculate_sortino(
-    returns
-):
+def calculate_sortino(returns):
+
+    if len(returns) < 2:
+
+        return 0
 
     downside = returns[
         returns < 0
     ]
 
-    if downside.std() == 0:
+    downside_std = downside.std()
+
+    if downside_std == 0:
 
         return 0
 
     sortino = (
 
         returns.mean()
-        / downside.std()
+
+        / downside_std
 
     ) * np.sqrt(252)
 
-    return sortino
+    return round(sortino, 2)
 
 
 # =====================================
-# BUILD SYSTEM CURVE
+# SYSTEM CURVE
 # =====================================
 def get_system_curve():
-
-    logger.info(
-        "Building system curve..."
-    )
 
     equity_curve = (
         get_equity_curve()
@@ -162,92 +239,33 @@ def get_system_curve():
 
         )
 
-    equity_curve = (
-        equity_curve.copy()
-    )
+    curve = equity_curve.copy()
 
-    equity_curve["date"] = pd.to_datetime(
-
-        equity_curve["date"]
-
-    )
-
-    equity_curve = equity_curve.sort_values(
-        "date"
-    )
-
-    starting_equity = float(
-
-        equity_curve.iloc[0][
-            "equity"
-        ]
-
-    )
-
-    # =====================================
-    # SAFETY
-    # =====================================
-    if starting_equity <= 0:
-
-        logger.warning(
-            "Invalid starting equity"
+    curve["normalized"] = (
+        normalize_curve(
+            curve["equity"]
         )
-
-        return pd.DataFrame()
-
-    equity_curve["normalized"] = (
-
-        equity_curve["equity"]
-
-        / starting_equity
-
-    ) * STARTING_CAPITAL
-
-    logger.info(
-        "System curve built"
     )
 
-    return equity_curve
+    return curve
 
 
 # =====================================
-# BUILD BENCHMARK CURVES
+# BENCHMARK CURVES
 # =====================================
 def get_benchmark_curves():
 
-    logger.info(
-        "Building benchmark curves..."
-    )
+    curves = {}
 
-    benchmark_curves = {}
-
-    # =====================================
-    # SYMBOL LOOP
-    # =====================================
     for symbol in BENCHMARKS:
 
-        logger.info(
-            f"Loading {symbol}"
-        )
-
-        df = get_historical_data(
+        df = load_benchmark_data(
             symbol
         )
 
         # =====================================
         # EMPTY SAFETY
         # =====================================
-        if df is None:
-
-            logger.warning(
-
-                f"No benchmark data "
-                f"for {symbol}"
-
-            )
-
-            continue
-
         if df.empty:
 
             continue
@@ -258,9 +276,12 @@ def get_benchmark_curves():
         close = df["Close"]
 
         # =====================================
-        # HANDLE DATAFRAME VS SERIES
+        # HANDLE DATAFRAME CASE
         # =====================================
-        if isinstance(close, pd.DataFrame):
+        if isinstance(
+            close,
+            pd.DataFrame
+        ):
 
             close = close.iloc[:, 0]
 
@@ -270,152 +291,64 @@ def get_benchmark_curves():
 
             continue
 
-        starting_price = float(
-            close.iloc[0]
+        normalized = (
+            normalize_curve(close)
         )
 
-        # =====================================
-        # SAFETY
-        # =====================================
-        if starting_price <= 0:
+        curves[symbol] = pd.DataFrame({
 
-            continue
+            "date":
+                close.index,
 
-        normalized = (
+            "close":
+                close.values,
 
-            close
-            / starting_price
+            "normalized":
+                normalized.values
 
-        ) * STARTING_CAPITAL
+        })
 
-        benchmark_curves[
-            symbol
-        ] = normalized
-
-    logger.info(
-        "Benchmark curves built"
-    )
-
-    return benchmark_curves
+    return curves
 
 
 # =====================================
-# METRICS
-# =====================================
-def calculate_metrics(
-    equity_series
-):
-
-    # =====================================
-    # EMPTY SAFETY
-    # =====================================
-    if equity_series is None:
-
-        return {}
-
-    if len(equity_series) < 2:
-
-        return {}
-
-    returns = (
-
-        equity_series
-
-        .pct_change()
-
-        .dropna()
-
-    )
-
-    starting = float(
-        equity_series.iloc[0]
-    )
-
-    ending = float(
-        equity_series.iloc[-1]
-    )
-
-    years = (
-        len(equity_series)
-        / 252
-    )
-
-    metrics = {
-
-        "final_equity":
-            round(ending, 2),
-
-        "cagr":
-            round(
-
-                calculate_cagr(
-                    starting,
-                    ending,
-                    years
-                ),
-
-                2
-
-            ),
-
-        "max_drawdown":
-            round(
-
-                calculate_max_drawdown(
-                    equity_series
-                ),
-
-                2
-
-            ),
-
-        "sharpe":
-            round(
-
-                calculate_sharpe(
-                    returns
-                ),
-
-                2
-
-            ),
-
-        "sortino":
-            round(
-
-                calculate_sortino(
-                    returns
-                ),
-
-                2
-
-            )
-
-    }
-
-    return metrics
-
-
-# =====================================
-# FULL BENCHMARK REPORT
+# BENCHMARK REPORT
 # =====================================
 def get_benchmark_report():
-
-    logger.info(
-        "Building benchmark report..."
-    )
-
-    system_curve = (
-        get_system_curve()
-    )
-
-    benchmark_curves = (
-        get_benchmark_curves()
-    )
 
     report = {
 
         "SYSTEM": {
+
+            "final_equity": 0,
+            "cagr": 0,
+            "max_drawdown": 0,
+            "sharpe": 0,
+            "sortino": 0
+
+        },
+
+        "SPY": {
+
+            "final_equity": 0,
+            "cagr": 0,
+            "max_drawdown": 0,
+            "sharpe": 0,
+            "sortino": 0
+
+        },
+
+        "QQQ": {
+
+            "final_equity": 0,
+            "cagr": 0,
+            "max_drawdown": 0,
+            "sharpe": 0,
+            "sortino": 0
+
+        },
+
+        "TQQQ": {
 
             "final_equity": 0,
             "cagr": 0,
@@ -430,46 +363,137 @@ def get_benchmark_report():
     # =====================================
     # SYSTEM METRICS
     # =====================================
+    system_curve = (
+        get_system_curve()
+    )
+
     if not system_curve.empty:
 
-        report["SYSTEM"] = (
+        equity = system_curve[
+            "normalized"
+        ]
 
-            calculate_metrics(
-
-                system_curve[
-                    "normalized"
-                ]
-
-            )
-
+        returns = (
+            equity.pct_change()
+            .dropna()
         )
+
+        report["SYSTEM"] = {
+
+            "final_equity":
+
+                round(
+                    float(
+                        equity.iloc[-1]
+                    ),
+                    2
+                ),
+
+            "cagr":
+
+                calculate_cagr(
+                    equity
+                ),
+
+            "max_drawdown":
+
+                calculate_max_drawdown(
+                    equity
+                ),
+
+            "sharpe":
+
+                calculate_sharpe(
+                    returns
+                ),
+
+            "sortino":
+
+                calculate_sortino(
+                    returns
+                )
+
+        }
 
     # =====================================
     # BENCHMARK METRICS
     # =====================================
-    for symbol, curve in benchmark_curves.items():
-
-        report[symbol] = (
-
-            calculate_metrics(
-                curve
-            )
-
-        )
-
-    logger.info(
-        "Benchmark report complete"
+    benchmark_curves = (
+        get_benchmark_curves()
     )
 
-    return {
+    for symbol, curve in benchmark_curves.items():
 
-        "report":
-            report,
+        equity = curve[
+            "normalized"
+        ]
 
-        "system_curve":
-            system_curve,
+        returns = (
+            equity.pct_change()
+            .dropna()
+        )
 
-        "benchmark_curves":
-            benchmark_curves
+        report[symbol] = {
 
-    }
+            "final_equity":
+
+                round(
+                    float(
+                        equity.iloc[-1]
+                    ),
+                    2
+                ),
+
+            "cagr":
+
+                calculate_cagr(
+                    equity
+                ),
+
+            "max_drawdown":
+
+                calculate_max_drawdown(
+                    equity
+                ),
+
+            "sharpe":
+
+                calculate_sharpe(
+                    returns
+                ),
+
+            "sortino":
+
+                calculate_sortino(
+                    returns
+                )
+
+        }
+
+    logger.info(
+        "Benchmark report built"
+    )
+
+    return report
+
+
+# =====================================
+# RUN
+# =====================================
+if __name__ == "__main__":
+
+    report = (
+        get_benchmark_report()
+    )
+
+    print(
+        "\n===== BENCHMARK REPORT =====\n"
+    )
+
+    for symbol, stats in report.items():
+
+        print(f"\n{symbol}")
+
+        for k, v in stats.items():
+
+            print(f"{k}: {v}")

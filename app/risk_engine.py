@@ -182,6 +182,13 @@ def get_risk_report():
                 2
             ),
 
+        "effective_leverage":
+
+            round(
+                effective_exposure,
+                2
+            ),
+
         "risk_status":
             risk_status,
 

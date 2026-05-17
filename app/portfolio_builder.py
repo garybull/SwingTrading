@@ -4,16 +4,31 @@ import pandas as pd
 from datetime import datetime
 
 from app.config import (
+
     TOP_N,
     CASH_RESERVE,
     START_CAPITAL
+
+)
+
+from app.regime_engine import (
+    determine_market_regime
+)
+
+from app.constraint_engine import (
+
+    validate_portfolio,
+    apply_constraints
+
 )
 
 from app.logger import logger
 
 from app.db_service import (
+
     query_df,
     execute
+
 )
 
 
@@ -56,6 +71,38 @@ def build_target_portfolio():
         return pd.DataFrame()
 
     # =====================================
+    # MARKET REGIME
+    # =====================================
+    regime_data = (
+        determine_market_regime()
+    )
+
+    regime = regime_data[
+        "regime"
+    ]
+
+    logger.info(
+
+        f"Market regime: "
+        f"{regime}"
+
+    )
+
+    # =====================================
+    # RISK OFF
+    # =====================================
+    if regime != "RISK_ON":
+
+        logger.warning(
+
+            "Risk-off regime detected. "
+            "Holding cash."
+
+        )
+
+        return pd.DataFrame()
+
+    # =====================================
     # SELECT TOP N
     # =====================================
     selected = rankings.head(
@@ -63,7 +110,35 @@ def build_target_portfolio():
     ).copy()
 
     # =====================================
-    # VOLATILITY-WEIGHTED
+    # SAFETY
+    # =====================================
+    if "volatility" not in selected.columns:
+
+        logger.error(
+            "Missing volatility column"
+        )
+
+        return pd.DataFrame()
+
+    # =====================================
+    # REMOVE INVALID VOLATILITY
+    # =====================================
+    selected = selected[
+
+        selected["volatility"] > 0
+
+    ]
+
+    if selected.empty:
+
+        logger.warning(
+            "No valid volatility data"
+        )
+
+        return pd.DataFrame()
+
+    # =====================================
+    # VOLATILITY WEIGHTING
     # MATCH BACKTEST LOGIC
     # =====================================
     selected[
@@ -76,10 +151,12 @@ def build_target_portfolio():
 
     )
 
-    total_inverse_vol = (
+    total_inverse_vol = float(
+
         selected[
             "inverse_volatility"
         ].sum()
+
     )
 
     # =====================================
@@ -110,8 +187,7 @@ def build_target_portfolio():
 
     # =====================================
     # TARGET ALLOCATION
-    # MATCH BACKTEST:
-    # capital * weight * (1 - CASH_RESERVE)
+    # MATCH BACKTEST
     # =====================================
     selected[
         "target_allocation"
@@ -126,12 +202,16 @@ def build_target_portfolio():
     # =====================================
     # ACTION LABEL
     # =====================================
-    selected["action"] = "BUY"
+    selected[
+        "action"
+    ] = "BUY"
 
     # =====================================
     # TARGET VALUE
     # =====================================
-    selected["target_value"] = (
+    selected[
+        "target_value"
+    ] = (
 
         START_CAPITAL
 
@@ -144,9 +224,11 @@ def build_target_portfolio():
     # =====================================
     # CURRENT PRICE
     # =====================================
-    selected["current_price"] = (
-        selected["close"]
-    )
+    selected[
+        "current_price"
+    ] = selected[
+        "close"
+    ]
 
     # =====================================
     # SHARE COUNT
@@ -155,11 +237,68 @@ def build_target_portfolio():
         "recommended_shares"
     ] = (
 
-        selected["target_value"]
+        selected[
+            "target_value"
+        ]
 
-        / selected["current_price"]
+        / selected[
+            "current_price"
+        ]
 
     ).astype(int)
+
+    # =====================================
+    # APPLY CONSTRAINTS
+    # =====================================
+    selected = (
+        apply_constraints(
+            selected
+        )
+    )
+
+    # =====================================
+    # VALIDATE PORTFOLIO
+    # =====================================
+    validation = (
+        validate_portfolio(
+            selected
+        )
+    )
+
+    if not validation["valid"]:
+
+        logger.warning(
+
+            "Portfolio constraint "
+            "violations detected"
+
+        )
+
+        for w in validation[
+            "warnings"
+        ]:
+
+            logger.warning(w)
+
+    else:
+
+        logger.info(
+            "Portfolio constraints passed"
+        )
+
+    logger.info(
+
+        f"Effective Exposure: "
+        f"{validation['effective_exposure']}%"
+
+    )
+
+    logger.info(
+
+        f"Cash Reserve: "
+        f"{validation['cash_reserve']}%"
+
+    )
 
     logger.info(
 

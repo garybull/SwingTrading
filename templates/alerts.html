@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="grid">
+
+    <!-- ===================================== -->
+    <!-- STATUS -->
+    <!-- ===================================== -->
+    <div class="card">
+
+        <h2>
+            System Alert Status
+        </h2>
+
+        {% if alert_report.status == "NORMAL" %}
+
+        <div class="metric" style="color: #00c853;">
+
+            {% elif alert_report.status == "WARNING" %}
+
+            <div class="metric" style="color: #ff9100;">
+
+                {% else %}
+
+                <div class="metric" style="color: #ff5252;">
+
+                    {% endif %}
+
+                    {{ alert_report.status }}
+
+                </div>
+
+                <p>
+                    Total Alerts:
+                    {{ alert_report.total_alerts }}
+                </p>
+
+                <p>
+                    High Alerts:
+                    {{ alert_report.high_alerts }}
+                </p>
+
+                <p>
+                    Medium Alerts:
+                    {{ alert_report.medium_alerts }}
+                </p>
+
+            </div>
+
+            <!-- ===================================== -->
+            <!-- ALERT STATS -->
+            <!-- ===================================== -->
+            <div class="card">
+
+                <h2>
+                    Alert Statistics
+                </h2>
+
+                <p>
+                    Total Historical Alerts:
+                    {{ alert_stats.total_alerts }}
+                </p>
+
+                <p>
+                    High Severity:
+                    {{ alert_stats.high_alerts }}
+                </p>
+
+                <p>
+                    Medium Severity:
+                    {{ alert_stats.medium_alerts }}
+                </p>
+
+                <p>
+                    Normal States:
+                    {{ alert_stats.normal_states }}
+                </p>
+
+                <p>
+                    Most Common Source:
+                    {{ alert_stats.most_common_source }}
+                </p>
+
+            </div>
+
+        </div>
+
+        <!-- ===================================== -->
+        <!-- ACTIVE ALERTS -->
+        <!-- ===================================== -->
+        <div class="card">
+
+            <h2>
+                Active Alerts
+            </h2>
+
+            {% if alert_report.total_alerts == 0 %}
+
+            <p style="
+            color: #00c853;
+        ">
+
+                ✅ No active alerts
+
+            </p>
+
+            {% else %}
+
+            {% for alert in alert_report.alerts %}
+
+            <div style="
+                margin-bottom: 15px;
+                padding: 10px;
+                border-bottom: 1px solid #333;
+            ">
+
+                {% if alert.level == "HIGH" %}
+
+                <span style="
+                        color: #ff5252;
+                        font-weight: bold;
+                    ">
+
+                    🔴 HIGH
+
+                </span>
+
+                {% else %}
+
+                <span style="
+                        color: #ff9100;
+                        font-weight: bold;
+                    ">
+
+                    🟠 MEDIUM
+
+                </span>
+
+                {% endif %}
+
+                [{{ alert.source }}]
+
+                — {{ alert.message }}
+
+            </div>
+
+            {% endfor %}
+
+            {% endif %}
+
+        </div>
+
+        <!-- ===================================== -->
+        <!-- ALERT HISTORY -->
+        <!-- ===================================== -->
+        <div class="card">
+
+            <h2>
+                Alert History
+            </h2>
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>Timestamp</th>
+                        <th>Level</th>
+                        <th>Source</th>
+                        <th>Message</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for row in alert_history.iterrows() %}
+
+                    {% set alert = row[1] %}
+
+                    <tr>
+
+                        <td>
+                            {{ alert.timestamp }}
+                        </td>
+
+                        <td>
+
+                            {% if alert.level == "HIGH" %}
+
+                            <span style="
+                                color: #ff5252;
+                                font-weight: bold;
+                            ">
+
+                                HIGH
+
+                            </span>
+
+                            {% elif alert.level == "MEDIUM" %}
+
+                            <span style="
+                                color: #ff9100;
+                                font-weight: bold;
+                            ">
+
+                                MEDIUM
+
+                            </span>
+
+                            {% else %}
+
+                            <span style="
+                                color: #00c853;
+                                font-weight: bold;
+                            ">
+
+                                NORMAL
+
+                            </span>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+                            {{ alert.source }}
+                        </td>
+
+                        <td>
+                            {{ alert.message }}
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% endblock %}

@@ -3,6 +3,10 @@
 from datetime import datetime
 import pandas as pd
 
+from app.regime_engine import (
+    determine_market_regime
+)
+
 from app.db_service import (
     query_df,
     execute
@@ -103,6 +107,44 @@ def refresh_system_state():
     )
 
     # =====================================
+    # DETERMINE CURRENT LEADER
+    # =====================================
+    regime_data = (
+        determine_market_regime()
+    )
+
+    regime = regime_data[
+        "regime"
+    ]
+
+    current_leader = "CASH"
+
+    if regime == "RISK_ON":
+
+        recommended = query_df("""
+
+            SELECT
+                symbol
+
+            FROM recommended_portfolio
+
+            ORDER BY score DESC
+
+            LIMIT 1
+
+        """)
+
+        if not recommended.empty:
+
+            current_leader = str(
+
+                recommended.iloc[0][
+                    "symbol"
+                ]
+
+            )
+
+    # =====================================
     # UPDATE SYSTEM STATE
     # =====================================
     execute("""
@@ -110,13 +152,17 @@ def refresh_system_state():
         UPDATE system_state
 
         SET
-            current_equity = ?
+            current_equity = ?,
+            current_leader = ?,
+            market_regime = ?
 
         WHERE id = 1
 
     """, (
 
         equity,
+        current_leader,
+        regime
 
     ))
 

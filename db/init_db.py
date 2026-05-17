@@ -174,6 +174,65 @@ def init_db():
 
     """)
 
+
+
+        # =====================================
+    # ALERT HISTORY
+    # =====================================
+    cur.execute("""
+
+        CREATE TABLE IF NOT EXISTS alert_history (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            date TEXT NOT NULL,
+
+            timestamp TEXT NOT NULL,
+
+            status TEXT NOT NULL,
+
+            source TEXT NOT NULL,
+
+            level TEXT NOT NULL,
+
+            message TEXT NOT NULL,
+
+            created_at TIMESTAMP
+                DEFAULT CURRENT_TIMESTAMP
+
+        )
+
+    """)
+
+    
+    # =====================================
+    # REGIME HISTORY
+    # =====================================
+    cur.execute("""
+
+        CREATE TABLE IF NOT EXISTS regime_history (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            date TEXT NOT NULL,
+
+            regime TEXT NOT NULL,
+
+            vix REAL,
+
+            spy_close REAL,
+
+            spy_200dma REAL,
+
+            qqq_close REAL,
+
+            qqq_200dma REAL,
+
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+        )
+
+    """)
     # =====================================
     # EXECUTED TRADES
     # =====================================

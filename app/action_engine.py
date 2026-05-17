@@ -1,10 +1,11 @@
 # app/action_engine.py
 
 import pandas as pd
-from app.config import (START_CAPITAL)
+
 from app.logger import logger
-from app.db_service import (
-    query_df
+
+from app.regime_engine import (
+    determine_market_regime
 )
 
 
@@ -28,6 +29,246 @@ def build_action_plan(
     actions = []
 
     # =====================================
+    # MARKET REGIME
+    # =====================================
+    regime_data = (
+        determine_market_regime()
+    )
+
+    regime = regime_data[
+        "regime"
+    ]
+
+    logger.info(
+
+        f"Current regime: "
+        f"{regime}"
+
+    )
+
+    # =====================================
+    # CURRENT POSITIONS MAP
+    # =====================================
+    current_map = {}
+
+    if (
+
+        current_positions is not None
+
+        and
+
+        len(current_positions) > 0
+
+    ):
+
+        current_map = {
+
+            row["symbol"]: row
+
+            for _, row
+
+            in current_positions.iterrows()
+
+        }
+
+    # =====================================
+    # RISK OFF
+    # MATCH BACKTEST
+    # =====================================
+    if regime != "RISK_ON":
+
+        logger.warning(
+
+            "Risk-off regime detected. "
+            "Generating liquidation plan."
+
+        )
+
+        for symbol, row in current_map.items():
+
+            current_price = float(
+
+                row.get(
+                    "current_price",
+                    0
+                )
+
+            )
+
+            current_shares = int(
+
+                row.get(
+                    "shares",
+                    0
+                )
+
+            )
+
+            current_market_value = float(
+
+                row.get(
+                    "market_value",
+                    0
+                )
+
+            )
+
+            if current_shares <= 0:
+
+                continue
+
+            stop = round(
+
+                current_price * 0.92,
+
+                2
+
+            )
+
+            target_1 = round(
+
+                current_price * 1.12,
+
+                2
+
+            )
+
+            target_2 = round(
+
+                current_price * 1.20,
+
+                2
+
+            )
+
+            risk_pct = round(
+
+                (
+                    (
+                        current_price
+                        - stop
+                    )
+
+                    / current_price
+
+                ) * 100,
+
+                2
+
+            )
+
+            reward_pct = round(
+
+                (
+                    (
+                        target_1
+                        - current_price
+                    )
+
+                    / current_price
+
+                ) * 100,
+
+                2
+
+            )
+
+            rr_ratio = round(
+
+                reward_pct / risk_pct,
+
+                2
+
+            ) if risk_pct > 0 else 0
+
+            actions.append({
+
+                "symbol":
+                    symbol,
+
+                "action":
+                    "SELL",
+
+                "score":
+                    0,
+
+                "target_allocation":
+                    0,
+
+                "current_allocation":
+
+                    float(
+
+                        row.get(
+                            "allocation_pct",
+                            0
+                        )
+
+                    ),
+
+                "allocation_delta":
+
+                    -float(
+
+                        row.get(
+                            "allocation_pct",
+                            0
+                        )
+
+                    ),
+
+                "current_price":
+                    current_price,
+
+                "target_position_value":
+                    0,
+
+                "position_size":
+                    current_market_value,
+
+                "recommended_shares":
+                    0,
+
+                "current_shares":
+                    current_shares,
+
+                "current_market_value":
+                    current_market_value,
+
+                "entry_price":
+                    current_price,
+
+                "stop":
+                    stop,
+
+                "target_1":
+                    target_1,
+
+                "target_2":
+                    target_2,
+
+                "risk_pct":
+                    risk_pct,
+
+                "reward_pct":
+                    reward_pct,
+
+                "rr_ratio":
+                    rr_ratio
+
+            })
+
+        logger.info(
+
+            f"Generated "
+            f"{len(actions)} "
+            f"risk-off liquidation actions"
+
+        )
+
+        return actions
+
+    # =====================================
     # EMPTY SAFETY
     # =====================================
     if recommended_portfolio is None:
@@ -37,65 +278,6 @@ def build_action_plan(
     if len(recommended_portfolio) == 0:
 
         return []
-
-    # =====================================
-    # CURRENT POSITIONS MAP
-    # =====================================
-    current_map = {}
-
-    total_equity = 0
-
-    if current_positions is not None:
-
-        if len(current_positions) > 0:
-
-            current_map = {
-
-                row["symbol"]: row
-
-                for _, row
-
-                in current_positions.iterrows()
-
-            }
-
-            # =====================================
-            # TOTAL EQUITY
-            # =====================================
-            # =====================================
-            # LOAD TOTAL SYSTEM EQUITY
-            # =====================================
-            state = query_df("""
-
-                SELECT
-                    current_equity
-
-                FROM system_state
-
-                WHERE id = 1
-
-            """)
-
-            if not state.empty:
-
-                total_equity = float(
-
-                    state.iloc[0][
-                        "current_equity"
-                    ]
-
-                )
-
-            else:
-
-                total_equity = START_CAPITAL
-
-    # =====================================
-    # FALLBACK
-    # =====================================
-    if total_equity <= 0:
-
-        total_equity = START_CAPITAL
 
     # =====================================
     # BUILD TARGET ACTIONS
@@ -117,6 +299,15 @@ def build_action_plan(
 
             row.get(
                 "current_price",
+                0
+            )
+
+        )
+
+        target_position_value = float(
+
+            row.get(
+                "target_value",
                 0
             )
 
@@ -176,7 +367,7 @@ def build_action_plan(
             current_market_value = 0
 
         # =====================================
-        # REQUIRED REBALANCE DELTA
+        # ALLOCATION DIFFERENCE
         # =====================================
         allocation_delta = (
 
@@ -187,7 +378,30 @@ def build_action_plan(
         )
 
         # =====================================
-        # ACTION TYPE
+        # POSITION SIZE DIFFERENCE
+        # =====================================
+        position_size = max(
+
+            target_position_value
+
+            - current_market_value,
+
+            0
+
+        )
+
+        # =====================================
+        # SHARES TO BUY
+        # =====================================
+        recommended_shares = int(
+
+            position_size
+            / current_price
+
+        ) if current_price > 0 else 0
+
+        # =====================================
+        # DETERMINE ACTION
         # =====================================
         if abs(allocation_delta) < threshold:
 
@@ -200,47 +414,6 @@ def build_action_plan(
         else:
 
             action = "SELL"
-
-        # =====================================
-        # REQUIRED POSITION VALUE
-        # =====================================
-        # =====================================
-        # TARGET POSITION VALUE
-        # =====================================
-        target_position_value = (
-
-            total_equity
-
-            * target_allocation
-
-        )
-
-        # =====================================
-        # REQUIRED TRADE VALUE
-        # =====================================
-        required_value = abs(
-
-            target_position_value
-
-            - current_market_value
-
-        )
-
-        # =====================================
-        # REQUIRED SHARES
-        # =====================================
-        required_shares = 0
-
-        if current_price > 0:
-
-            required_shares = int(
-
-                required_value
-
-                / current_price
-
-            )
-
 
         # =====================================
         # RISK MODEL
@@ -272,8 +445,10 @@ def build_action_plan(
         risk_pct = round(
 
             (
-
-                (current_price - stop)
+                (
+                    current_price
+                    - stop
+                )
 
                 / current_price
 
@@ -286,8 +461,10 @@ def build_action_plan(
         reward_pct = round(
 
             (
-
-                (target_1 - current_price)
+                (
+                    target_1
+                    - current_price
+                )
 
                 / current_price
 
@@ -331,16 +508,14 @@ def build_action_plan(
             "current_price":
                 current_price,
 
-            # FINAL TARGET POSITION
             "target_position_value":
                 target_position_value,
 
-            # REQUIRED TRADE SIZE
             "position_size":
-                required_value,
+                position_size,
 
             "recommended_shares":
-                required_shares,
+                recommended_shares,
 
             "current_shares":
                 current_shares,

@@ -6,20 +6,510 @@
 
 <div class="grid">
 
-    <div class="card">
+    <!-- ===================================== -->
+    <!-- MARKET REGIME -->
+    <!-- ===================================== -->
+    <div class="card regime-card">
 
-        <h2>
-            Market Regime
+        {% if regime.regime == "RISK_ON" %}
+
+        <h2 style="color: #00c853;">
+
+            🟢 MARKET REGIME:
+            RISK ON
+
         </h2>
 
-        <div class="metric">
+        {% else %}
 
-            {{ system_state.market_regime }}
+        <h2 style="color: #ff5252;">
 
-        </div>
+            🔴 MARKET REGIME:
+            RISK OFF
+
+        </h2>
+
+        {% endif %}
+
+        <p>
+            VIX: {{ regime.vix }}
+        </p>
+
+        <p>
+            SPY vs 200DMA:
+            {{ regime.spy_close }}
+            /
+            {{ regime.spy_200dma }}
+        </p>
+
+        <p>
+            QQQ vs 200DMA:
+            {{ regime.qqq_close }}
+            /
+            {{ regime.qqq_200dma }}
+        </p>
 
     </div>
 
+    <!-- ===================================== -->
+    <!-- ALERT CENTER -->
+    <!-- ===================================== -->
+    <div class="card">
+    
+        <h2>
+            Alert Center
+        </h2>
+    
+        {% if alert_report.status == "NORMAL" %}
+    
+        <div class="metric" style="color: #00c853;">
+    
+            {% elif alert_report.status == "WARNING" %}
+    
+            <div class="metric" style="color: #ff9100;">
+    
+                {% else %}
+    
+                <div class="metric" style="color: #ff5252;">
+    
+                    {% endif %}
+    
+                    {{ alert_report.status }}
+    
+                </div>
+    
+                <p>
+    
+                    High Alerts:
+                    {{ alert_report.high_alerts }}
+    
+                </p>
+    
+                <p>
+    
+                    Medium Alerts:
+                    {{ alert_report.medium_alerts }}
+    
+                </p>
+    
+                <p>
+    
+                    Total Alerts:
+                    {{ alert_report.total_alerts }}
+    
+                </p>
+    
+                {% if alert_report.total_alerts > 0 %}
+    
+                <hr style="
+                margin-top: 15px;
+                margin-bottom: 15px;
+                border-color: #333;
+            ">
+    
+                {% for alert in alert_report.alerts %}
+    
+                <div style="
+                    margin-bottom: 12px;
+                    font-size: 14px;
+                ">
+    
+                    {% if alert.level == "HIGH" %}
+    
+                    <span style="
+                            color: #ff5252;
+                            font-weight: bold;
+                        ">
+    
+                        🔴 HIGH
+    
+                    </span>
+    
+                    {% else %}
+    
+                    <span style="
+                            color: #ff9100;
+                            font-weight: bold;
+                        ">
+    
+                        🟠 MEDIUM
+    
+                    </span>
+    
+                    {% endif %}
+    
+                    [{{ alert.source }}]
+    
+                    — {{ alert.message }}
+    
+                </div>
+    
+                {% endfor %}
+    
+                {% else %}
+    
+                <p style="
+                color: #00c853;
+                margin-top: 15px;
+            ">
+    
+                    ✅ No active alerts
+    
+                </p>
+    
+                {% endif %}
+    
+            </div>
+            
+    <!-- ===================================== -->
+    <!-- PORTFOLIO HEALTH -->
+    <!-- ===================================== -->
+    <div class="card">
+    
+        <h2>
+            Portfolio Health
+        </h2>
+    
+        {% if health_report.status == "Excellent" %}
+    
+        <div class="metric" style="color: #00c853;">
+    
+            {% elif health_report.status == "Healthy" %}
+    
+            <div class="metric" style="color: #64dd17;">
+    
+                {% elif health_report.status == "Elevated Risk" %}
+    
+                <div class="metric" style="color: #ff9100;">
+    
+                    {% else %}
+    
+                    <div class="metric" style="color: #ff5252;">
+    
+                        {% endif %}
+    
+                        {{ health_report.status }}
+    
+                    </div>
+    
+                    <p>
+    
+                        Health Score:
+                        {{ health_report.score }}/100
+    
+                    </p>
+    
+                    <p>
+    
+                        Warnings:
+                        {{ health_report.warning_count }}
+    
+                    </p>
+    
+                    {% if health_report.warning_count > 0 %}
+    
+                    <hr style="
+                margin-top: 15px;
+                margin-bottom: 15px;
+                border-color: #333;
+            ">
+    
+                    {% for w in health_report.warnings %}
+    
+                    <div style="
+                    margin-bottom: 10px;
+                    font-size: 14px;
+                ">
+    
+                        {% if w.level == "HIGH" %}
+    
+                        <span style="
+                            color: #ff5252;
+                            font-weight: bold;
+                        ">
+    
+                            🔴 HIGH
+    
+                        </span>
+    
+                        {% elif w.level == "MEDIUM" %}
+    
+                        <span style="
+                            color: #ff9100;
+                            font-weight: bold;
+                        ">
+    
+                            🟠 MEDIUM
+    
+                        </span>
+    
+                        {% else %}
+    
+                        <span style="
+                            color: #ffd600;
+                            font-weight: bold;
+                        ">
+    
+                            🟡 LOW
+    
+                        </span>
+    
+                        {% endif %}
+    
+                        — {{ w.message }}
+    
+                    </div>
+    
+                    {% endfor %}
+    
+                    {% else %}
+    
+                    <p style="
+                color: #00c853;
+                margin-top: 15px;
+            ">
+    
+                        ✅ No portfolio warnings
+    
+                    </p>
+    
+                    {% endif %}
+    
+                </div>
+
+    <!-- ===================================== -->
+    <!-- RISK STATUS -->
+    <!-- ===================================== -->
+    <div class="card">
+
+        <h2>
+            Risk Status
+        </h2>
+
+        {% if risk_report.risk_status == "Conservative" %}
+        
+        <div class="metric" style="color: #00c853;">
+        
+            {% elif risk_report.risk_status == "Moderate" %}
+        
+            <div class="metric" style="color: #ffd600;">
+        
+                {% elif risk_report.risk_status == "Aggressive" %}
+        
+                <div class="metric" style="color: #ff9100;">
+        
+                    {% elif risk_report.risk_status == "Extreme" %}
+        
+                    <div class="metric" style="color: #ff5252;">
+        
+                        {% else %}
+        
+                        <div class="metric" style="color: #9e9e9e;">
+        
+                            {% endif %}
+        
+                            {{ risk_report.risk_status }}
+        
+                        </div>
+
+        <p>
+        
+            Effective Exposure:
+            {{ risk_report.effective_exposure }}%
+        
+            ({{ risk_report.effective_leverage }}x)
+        
+        </p>
+
+        <p>
+
+            Cash:
+            {{ risk_report.cash_pct }}%
+
+        </p>
+
+        <p>
+
+            Largest Position:
+            {{ risk_report.largest_position }}%
+
+        </p>
+
+    </div>
+<!-- ===================================== -->
+<!-- DRAWDOWN STATUS -->
+<!-- ===================================== -->
+<div class="card">
+
+    <h2>
+        Drawdown Status
+    </h2>
+
+    {% if drawdown_report["status"] == "Healthy" %}
+
+    <div class="metric" style="color: #00c853;">
+
+        {% elif drawdown_report["status"] == "Moderate Stress" %}
+
+        <div class="metric" style="color: #ffd600;">
+
+            {% elif drawdown_report["status"] == "Elevated Risk" %}
+
+            <div class="metric" style="color: #ff9100;">
+
+                {% else %}
+
+                <div class="metric" style="color: #ff5252;">
+
+                    {% endif %}
+
+                    {{ drawdown_report["status"] }}
+
+                </div>
+
+                <p>
+
+                    Current Drawdown:
+                    {{ drawdown_report["current_drawdown"] }}%
+
+                </p>
+
+                <p>
+
+                    Max Drawdown:
+                    {{ drawdown_report["max_drawdown"] }}%
+
+                </p>
+
+                <p>
+
+                    5-Day Change:
+                    {{ drawdown_report["drawdown_change_5d"] }}%
+
+                </p>
+
+                <p>
+
+                    Days Underwater:
+                    {{ drawdown_report["days_underwater"] }}
+
+                </p>
+
+                {% if drawdown_report.get("alerts", [])|length > 0 %}
+
+                <hr style="
+        margin-top: 15px;
+        margin-bottom: 15px;
+        border-color: #333;
+    ">
+
+                {% for alert in drawdown_report.get("alerts", []) %}
+
+                <div style="
+        margin-bottom: 10px;
+        font-size: 14px;
+    ">
+
+                    {% if alert["level"] == "HIGH" %}
+
+                    <span style="
+            color: #ff5252;
+            font-weight: bold;
+        ">
+
+                        🔴 HIGH
+
+                    </span>
+
+                    {% else %}
+
+                    <span style="
+            color: #ff9100;
+            font-weight: bold;
+        ">
+
+                        🟠 MEDIUM
+
+                    </span>
+
+                    {% endif %}
+
+                    — {{ alert["message"] }}
+
+                </div>
+
+                {% endfor %}
+
+                {% else %}
+
+                <p style="
+        color: #00c853;
+        margin-top: 15px;
+    ">
+
+                    ✅ Drawdown stable
+
+                </p>
+
+                {% endif %}
+
+            </div>
+    <!-- ===================================== -->
+    <!-- SUGGESTED EXPOSURE -->
+    <!-- ===================================== -->
+    <div class="card">
+    
+        <h2>
+            Suggested Exposure
+        </h2>
+    
+        {% if suggested_exposure.suggested_exposure >= 90 %}
+    
+        <div class="metric" style="color: #00c853;">
+    
+            {% elif suggested_exposure.suggested_exposure >= 70 %}
+    
+            <div class="metric" style="color: #ffd600;">
+    
+                {% elif suggested_exposure.suggested_exposure > 0 %}
+    
+                <div class="metric" style="color: #ff9100;">
+    
+                    {% else %}
+    
+                    <div class="metric" style="color: #ff5252;">
+    
+                        {% endif %}
+    
+                        {{ suggested_exposure.suggested_exposure }}%
+    
+                    </div>
+    
+                    <p>
+    
+                        {{ suggested_exposure.label }}
+    
+                    </p>
+    
+                    <p>
+    
+                        VIX:
+                        {{ suggested_exposure.vix }}
+    
+                    </p>
+    
+                    <p>
+    
+                        {{ suggested_exposure.reason }}
+    
+                    </p>
+    
+                </div>
+            
+
+    <!-- ===================================== -->
+    <!-- CURRENT LEADER -->
+    <!-- ===================================== -->
     <div class="card">
 
         <h2>
@@ -27,13 +517,24 @@
         </h2>
 
         <div class="metric">
-
+        
+            {% if system_state.current_leader %}
+        
             {{ system_state.current_leader }}
-
+        
+            {% else %}
+        
+            CASH
+        
+            {% endif %}
+        
         </div>
 
     </div>
 
+    <!-- ===================================== -->
+    <!-- CURRENT EQUITY -->
+    <!-- ===================================== -->
     <div class="card">
 
         <h2>
@@ -50,6 +551,9 @@
 
     </div>
 
+    <!-- ===================================== -->
+    <!-- CURRENT CASH -->
+    <!-- ===================================== -->
     <div class="card">
 
         <h2>
@@ -66,6 +570,9 @@
 
     </div>
 
+    <!-- ===================================== -->
+    <!-- CURRENT DRAWDOWN -->
+    <!-- ===================================== -->
     <div class="card">
 
         <h2>
@@ -80,6 +587,9 @@
 
     </div>
 
+    <!-- ===================================== -->
+    <!-- CAGR -->
+    <!-- ===================================== -->
     <div class="card">
 
         <h2>
@@ -87,13 +597,40 @@
         </h2>
 
         <div class="metric">
-
-            {{ performance.cagr }}%
-
+        
+            {% if performance.cagr is not none %}
+        
+            {{ "%.2f"|format(
+            performance.cagr
+            ) }}%
+        
+            {% else %}
+        
+            <span style="font-size: 28px;">
+        
+                N/A
+        
+            </span>
+        
+            <div style="
+                    font-size: 14px;
+                    color: #9e9e9e;
+                    margin-top: 10px;
+                ">
+        
+                Not enough history
+        
+            </div>
+        
+            {% endif %}
+        
         </div>
 
     </div>
 
+    <!-- ===================================== -->
+    <!-- MAX DRAWDOWN -->
+    <!-- ===================================== -->
     <div class="card">
 
         <h2>
@@ -108,6 +645,9 @@
 
     </div>
 
+    <!-- ===================================== -->
+    <!-- UNREALIZED P/L -->
+    <!-- ===================================== -->
     <div class="card">
 
         <h2>
@@ -124,6 +664,9 @@
 
     </div>
 
+    <!-- ===================================== -->
+    <!-- REALIZED P/L -->
+    <!-- ===================================== -->
     <div class="card">
 
         <h2>
@@ -142,6 +685,9 @@
 
 </div>
 
+<!-- ===================================== -->
+<!-- EQUITY CURVE -->
+<!-- ===================================== -->
 <div class="card">
 
     <h2>
@@ -152,6 +698,9 @@
 
 </div>
 
+<!-- ===================================== -->
+<!-- MAINTENANCE -->
+<!-- ===================================== -->
 <div class="card">
 
     <h2>
@@ -170,6 +719,9 @@
 
 </div>
 
+<!-- ===================================== -->
+<!-- PLOTLY -->
+<!-- ===================================== -->
 <script>
 
     let equityChart = {{ equity_chart | safe }};
