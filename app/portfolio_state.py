@@ -1,11 +1,6 @@
 # app/portfolio_state.py
 
 from datetime import datetime
-import pandas as pd
-
-from app.regime_engine import (
-    determine_market_regime
-)
 
 from app.db_service import (
     query_df,
@@ -25,42 +20,49 @@ def refresh_system_state():
     )
 
     # =====================================
-    # LOAD POSITIONS
+    # LAZY IMPORTS
     # =====================================
-    positions = query_df("""
+    from app.regime_engine import (
+        determine_market_regime
+    )
 
-        SELECT
-            symbol,
-            shares,
-            current_price,
-            market_value
-
-        FROM positions
-
-    """)
+    from app.live_portfolio import (
+        get_live_portfolio
+    )
 
     # =====================================
-    # MARKET VALUE
+    # LIVE PORTFOLIO
     # =====================================
-    total_market_value = 0
+    portfolio = get_live_portfolio()
 
-    if not positions.empty:
+    positions_df = portfolio[
+        "positions"
+    ]
 
-        total_market_value = float(
+    cash = float(
+        portfolio[
+            "cash"
+        ]
+    )
 
-            positions[
-                "market_value"
-            ].sum()
+    total_market_value = float(
+        portfolio[
+            "market_value"
+        ]
+    )
 
-        )
+    total_equity = float(
+        portfolio[
+            "total_equity"
+        ]
+    )
 
     # =====================================
-    # LOAD CASH
+    # LOAD SYSTEM STATE
     # =====================================
     state = query_df("""
 
         SELECT
-            current_cash,
             starting_capital
 
         FROM system_state
@@ -78,15 +80,14 @@ def refresh_system_state():
             "No system_state row found"
         )
 
-        return 0
+        return {
 
-    cash = float(
+            "equity": 0,
+            "cash": 0,
+            "market_value": 0,
+            "starting_capital": 0
 
-        state.iloc[0][
-            "current_cash"
-        ]
-
-    )
+        }
 
     starting_capital = float(
 
@@ -97,26 +98,20 @@ def refresh_system_state():
     )
 
     # =====================================
-    # TOTAL EQUITY
-    # =====================================
-    equity = (
-
-        cash
-        + total_market_value
-
-    )
-
-    # =====================================
-    # DETERMINE CURRENT LEADER
+    # DETERMINE REGIME
     # =====================================
     regime_data = (
         determine_market_regime()
     )
 
-    regime = regime_data[
-        "regime"
-    ]
+    regime = regime_data.get(
+        "regime",
+        "UNKNOWN"
+    )
 
+    # =====================================
+    # CURRENT LEADER
+    # =====================================
     current_leader = "CASH"
 
     if regime == "RISK_ON":
@@ -154,24 +149,26 @@ def refresh_system_state():
         SET
             current_equity = ?,
             current_leader = ?,
-            market_regime = ?
+            market_regime = ?,
+            current_cash = ?
 
         WHERE id = 1
 
     """, (
 
-        equity,
+        total_equity,
         current_leader,
-        regime
+        regime,
+        cash
 
     ))
 
     # =====================================
     # UPDATE POSITION ALLOCATIONS
     # =====================================
-    if not positions.empty and equity > 0:
+    if not positions_df.empty and total_equity > 0:
 
-        for _, row in positions.iterrows():
+        for _, row in positions_df.iterrows():
 
             symbol = row["symbol"]
 
@@ -182,7 +179,7 @@ def refresh_system_state():
             allocation_pct = (
 
                 market_value
-                / equity
+                / total_equity
 
             )
 
@@ -190,11 +187,20 @@ def refresh_system_state():
 
                 UPDATE positions
 
-                SET allocation_pct = ?
+                SET
+                    current_price = ?,
+                    market_value = ?,
+                    allocation_pct = ?
 
                 WHERE symbol = ?
 
             """, (
+
+                float(
+                    row["current_price"]
+                ),
+
+                market_value,
 
                 allocation_pct,
 
@@ -203,7 +209,7 @@ def refresh_system_state():
             ))
 
     # =====================================
-    # SAVE EQUITY SNAPSHOT
+    # SAVE DAILY SNAPSHOT
     # =====================================
     today = datetime.now().strftime(
         "%Y-%m-%d"
@@ -238,11 +244,8 @@ def refresh_system_state():
     """, (
 
         today,
-
-        equity,
-
+        total_equity,
         cash,
-
         total_market_value
 
     ))
@@ -250,16 +253,22 @@ def refresh_system_state():
     logger.info(
 
         f"System state refreshed | "
-        f"Equity=${equity:,.2f} | "
+
         f"Cash=${cash:,.2f} | "
-        f"Market Value=${total_market_value:,.2f}"
+
+        f"Market Value=${total_market_value:,.2f} | "
+
+        f"Equity=${total_equity:,.2f}"
 
     )
 
+    # =====================================
+    # RETURN
+    # =====================================
     return {
 
         "equity":
-            equity,
+            total_equity,
 
         "cash":
             cash,

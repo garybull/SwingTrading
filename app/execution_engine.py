@@ -12,9 +12,10 @@ from app.db_service import (
     query_df,
     execute
 )
-
-from app.portfolio_state import (
-    refresh_system_state
+from app.db_service import (
+    query_df,
+    execute,
+    get_connection
 )
 
 
@@ -53,28 +54,80 @@ def get_current_cash():
 # =====================================
 def update_cash(new_cash):
 
-    execute("""
+    logger.info(
+        f"NEW CASH SHOULD BE: "
+        f"${new_cash:,.2f}"
+    )
 
-        UPDATE system_state
+    verify = query_df("""
 
-        SET current_cash = ?
+        SELECT current_cash
+
+        FROM system_state
 
         WHERE id = 1
 
-    """, (
+    """)
 
-        new_cash,
+    logger.info(
+        f"DB CASH AFTER UPDATE: "
+        f"${float(verify.iloc[0]['current_cash']):,.2f}"
+    )
 
-    ))
+    logger.info(
+        f"Updating cash to "
+        f"${new_cash:,.2f}"
+    )
+
+    conn = get_connection()
+
+    cur = conn.cursor()
+
+    try:
+
+        cur.execute("""
+
+            UPDATE system_state
+
+            SET current_cash = ?
+
+            WHERE id = 1
+
+        """, (
+
+            float(new_cash),
+
+        ))
+
+        conn.commit()
+
+        logger.info(
+
+            f"Rows updated: "
+            f"{cur.rowcount}"
+
+        )
+
+    finally:
+
+        conn.close()
+
+    verify = query_df("""
+
+        SELECT current_cash
+
+        FROM system_state
+
+        WHERE id = 1
+
+    """)
 
     logger.info(
 
-        f"Cash updated to "
-        f"${new_cash:,.2f}"
+        f"Verified cash: "
+        f"${float(verify.iloc[0]['current_cash']):,.2f}"
 
     )
-
-
 # =====================================
 # GET POSITION
 # =====================================
@@ -488,6 +541,9 @@ def execute_buy(
     # =====================================
     # REFRESH EQUITY
     # =====================================
+    from app.portfolio_state import (
+        refresh_system_state
+    )
     refresh_system_state()
 
     logger.info(

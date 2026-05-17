@@ -40,15 +40,28 @@ def get_live_portfolio():
     # =====================================
     if positions.empty:
 
+        current_cash = 0
+
+        if not system_state.empty:
+
+            current_cash = float(
+                system_state.iloc[0].get(
+                    "current_cash",
+                    0
+                )
+            )
+
         return {
 
             "positions": pd.DataFrame(),
 
-            "equity": 0,
+            "equity": current_cash,
 
-            "cash": 0,
+            "cash": current_cash,
 
-            "total_equity": 0
+            "market_value": 0,
+
+            "total_equity": current_cash
 
         }
 
@@ -229,10 +242,14 @@ def get_live_portfolio():
             positions_df,
 
         "equity":
-            total_market_value,
+            total_equity,
 
         "cash":
             current_cash,
+
+        "market_value":
+        
+            total_market_value,
 
         "total_equity":
             total_equity
