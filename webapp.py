@@ -33,9 +33,6 @@ from app.drawdown_engine import (
 from app.risk_engine import (
     get_risk_report
 )
-from app.regime_service import (
-    load_latest_regime
-)
 from app.pnl_engine import (
     get_pnl_summary
 )
@@ -148,7 +145,7 @@ def dashboard():
 
     data = get_dashboard_data()
 
-    regime = load_latest_regime()
+    regime = determine_market_regime()
 
     risk_report = (
         get_risk_report()

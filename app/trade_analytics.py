@@ -316,6 +316,10 @@ def get_trade_analytics():
             / gross_loss
         )
 
+    elif gross_profit > 0:
+
+        profit_factor = float("inf")
+
     else:
 
         profit_factor = 0
@@ -352,13 +356,21 @@ def get_trade_analytics():
     # =====================================
     # EXTREMES
     # =====================================
-    largest_win = (
-        closed["pnl"].max()
-    )
+    largest_win = 0
 
-    largest_loss = (
-        closed["pnl"].min()
-    )
+    largest_loss = 0
+
+    if total_wins > 0:
+
+        largest_win = (
+            winners["pnl"].max()
+        )
+
+    if total_losses > 0:
+
+        largest_loss = (
+            losers["pnl"].min()
+        )
 
     # =====================================
     # SYMBOL ATTRIBUTION
