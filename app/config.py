@@ -22,7 +22,7 @@ REBALANCE_OFFSET = 0
 
 CASH_RESERVE = 0.15
 
-SLIPPAGE = 0.001
+SLIPPAGE = 0.0000
 
 
 # =====================================

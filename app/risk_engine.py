@@ -73,14 +73,32 @@ def get_risk_report():
 
     if positions.empty:
 
+        cash_pct = 0
+
+        if total_equity > 0:
+
+            cash_pct = round(
+
+                (
+                    cash
+                    / total_equity
+                ) * 100,
+
+                2
+
+            )
+
         return {
 
             "effective_exposure": 0,
 
+            "effective_leverage": 0,
+
             "risk_status":
                 "No Positions",
 
-            "cash_pct": 0,
+            "cash_pct":
+                cash_pct,
 
             "largest_position": 0,
 

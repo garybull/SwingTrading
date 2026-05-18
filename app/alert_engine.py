@@ -28,7 +28,9 @@ from app.live_portfolio import (
 # =====================================
 # BUILD ALERT REPORT
 # =====================================
-def get_alert_report():
+def get_alert_report(
+        health_report=None
+):
 
     logger.info(
         "Building alert report..."
@@ -39,9 +41,11 @@ def get_alert_report():
     # =====================================
     # LOAD ENGINES
     # =====================================
-    health_report = (
-        get_health_report()
-    )
+    if health_report is None:
+
+        health_report = (
+            get_health_report()
+        )
 
     drawdown_report = (
         get_drawdown_report()

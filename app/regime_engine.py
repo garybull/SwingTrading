@@ -2,12 +2,23 @@
 
 import pandas as pd
 
+from datetime import datetime, timedelta
+
 from app.logger import logger
 
 from app.market_data_service import (
     get_historical_data,
     get_live_price
 )
+
+# =====================================
+# REGIME CACHE
+# =====================================
+_cached_regime = None
+
+_cached_timestamp = None
+
+CACHE_MINUTES = 10
 
 
 # =====================================
@@ -126,6 +137,37 @@ def determine_market_regime():
         "Determining market regime..."
     )
 
+    global _cached_regime
+    global _cached_timestamp
+
+    # =====================================
+    # CACHE CHECK
+    # =====================================
+    if (
+
+        _cached_regime is not None
+
+        and
+
+        _cached_timestamp is not None
+
+    ):
+
+        age = (
+
+            datetime.now()
+            - _cached_timestamp
+
+        ).total_seconds() / 60
+
+        if age < CACHE_MINUTES:
+
+            logger.info(
+                "Using cached regime"
+            )
+
+            return _cached_regime
+
     # =====================================
     # LOAD DATA
     # =====================================
@@ -206,7 +248,10 @@ def determine_market_regime():
 
     )
 
-    return {
+    # =====================================
+    # BUILD RESPONSE
+    # =====================================
+    regime_data = {
 
         "regime":
             regime,
@@ -250,6 +295,18 @@ def determine_market_regime():
 
     }
 
+    # =====================================
+    # UPDATE CACHE
+    # =====================================
+    _cached_regime = (
+        regime_data
+    )
+
+    _cached_timestamp = (
+        datetime.now()
+    )
+
+    return regime_data
 
 # =====================================
 # SUGGESTED EXPOSURE

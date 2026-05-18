@@ -17,7 +17,12 @@ from app.db_service import (
     execute,
     get_connection
 )
+from app.services.journal_service import (
 
+    create_journal_entry,
+    close_journal_entry
+
+)
 
 # =====================================
 # GET CURRENT CASH
@@ -544,7 +549,48 @@ def execute_buy(
     from app.portfolio_state import (
         refresh_system_state
     )
+
     refresh_system_state()
+
+    # =====================================
+    # JOURNAL ENTRY
+    # =====================================
+    rankings = query_df("""
+
+        SELECT *
+
+        FROM rankings
+
+        WHERE symbol = ?
+
+        LIMIT 1
+
+    """, (
+
+        symbol,
+
+    ))
+
+    ranking_row = None
+
+    if not rankings.empty:
+
+        ranking_row = (
+            rankings.iloc[0]
+            .to_dict()
+        )
+
+    create_journal_entry(
+
+        symbol=symbol,
+
+        shares=shares,
+
+        entry_price=fill_price,
+
+        ranking_row=ranking_row
+
+    )
 
     logger.info(
         "BUY execution complete"
@@ -675,7 +721,22 @@ def execute_sell(
     # =====================================
     # REFRESH EQUITY
     # =====================================
+    from app.portfolio_state import (
+        refresh_system_state
+    )
+
     refresh_system_state()
+
+    # =====================================
+    # CLOSE JOURNAL ENTRY
+    # =====================================
+    close_journal_entry(
+
+        symbol=symbol,
+        shares_sold=shares,
+        exit_price=fill_price
+
+    )
 
     logger.info(
         "SELL execution complete"

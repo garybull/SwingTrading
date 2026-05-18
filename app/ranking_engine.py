@@ -7,6 +7,10 @@ from app.config import (
     UNIVERSE
 )
 
+from app.services.universe_ranking_service import (
+    save_universe_snapshot
+)
+
 from app.strategy import (
     score_asset
 )
@@ -198,7 +202,7 @@ def load_rankings():
 
 
 # =====================================
-# RUN FULL RANKING PIPELINE
+# RUN RANKINGS
 # =====================================
 def run_rankings():
 
@@ -208,8 +212,39 @@ def run_rankings():
 
         return rankings_df
 
+    # =====================================
+    # SAVE CURRENT RANKINGS
+    # =====================================
     save_rankings(
         rankings_df
+    )
+
+    # =====================================
+    # REGIME
+    # =====================================
+    from app.regime_engine import (
+        determine_market_regime
+    )
+
+    regime_data = (
+        determine_market_regime()
+    )
+
+    # =====================================
+    # SAVE UNIVERSE SNAPSHOT
+    # =====================================
+    save_universe_snapshot(
+
+        rankings=
+            rankings_df.to_dict(
+                orient="records"
+            ),
+
+        regime=
+            regime_data[
+                "regime"
+            ]
+
     )
 
     return rankings_df

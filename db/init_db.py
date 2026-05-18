@@ -113,35 +113,156 @@ def init_db():
     )
 
     """)
-
-    # =====================================
+        # =====================================
     # RECOMMENDED PORTFOLIO
     # =====================================
     cur.execute("""
 
-    CREATE TABLE IF NOT EXISTS recommended_portfolio (
+        CREATE TABLE IF NOT EXISTS recommended_portfolio (
 
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-        date TEXT,
+            date TEXT,
 
-        symbol TEXT,
+            symbol TEXT,
 
-        target_allocation REAL,
+            target_allocation REAL,
 
-        score REAL,
+            score REAL,
 
-        action TEXT,
+            action TEXT,
 
-        current_price REAL,
+            current_price REAL,
 
-        target_value REAL,
+            target_value REAL,
 
-        recommended_shares INTEGER,
+            recommended_shares INTEGER,
 
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP
+                DEFAULT CURRENT_TIMESTAMP
 
-    )
+        )
+
+    """)
+
+    # =====================================
+    # TRADE JOURNAL
+    # =====================================
+    cur.execute("""
+
+        CREATE TABLE IF NOT EXISTS trade_journal (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            symbol TEXT,
+
+            entry_date TEXT,
+
+            exit_date TEXT,
+
+            shares INTEGER,
+
+            entry_price REAL,
+
+            exit_price REAL,
+
+            realized_pnl REAL,
+
+            holding_days INTEGER,
+
+            regime_entry TEXT,
+
+            regime_exit TEXT,
+
+            entry_score REAL,
+
+            exit_score REAL,
+
+            entry_rank INTEGER,
+
+            exit_rank INTEGER,
+
+            volatility_entry REAL,
+
+            effective_exposure_entry REAL,
+
+            cash_pct_entry REAL,
+
+            health_score_entry REAL,
+                
+            remaining_shares INTEGER,
+
+            created_at TIMESTAMP
+                DEFAULT CURRENT_TIMESTAMP
+
+        )
+
+    """)
+
+    # =====================================
+    # UNIVERSE RANKINGS
+    # =====================================
+    cur.execute("""
+
+        CREATE TABLE IF NOT EXISTS universe_rankings (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            snapshot_date TEXT,
+
+            symbol TEXT,
+
+            price REAL,
+
+            score REAL,
+
+            rank_position INTEGER,
+
+            recommended INTEGER,
+
+            score_gap_to_top REAL,
+
+            score_gap_to_buy_cutoff REAL,
+
+            momentum_20d REAL,
+
+            momentum_acceleration REAL,
+
+            volatility REAL,
+
+            regime TEXT,
+
+            created_at TIMESTAMP
+                DEFAULT CURRENT_TIMESTAMP
+
+        )
+
+    """)
+
+    # =====================================
+    # UNIVERSE RANKINGS INDEXES
+    # =====================================
+    cur.execute("""
+
+        CREATE INDEX IF NOT EXISTS idx_universe_rankings_date
+
+        ON universe_rankings(snapshot_date)
+
+    """)
+
+    cur.execute("""
+
+        CREATE INDEX IF NOT EXISTS idx_universe_rankings_symbol
+
+        ON universe_rankings(symbol)
+
+    """)
+
+    cur.execute("""
+
+        CREATE INDEX IF NOT EXISTS idx_universe_rankings_symbol_date
+
+        ON universe_rankings(symbol, snapshot_date)
 
     """)
 
@@ -174,9 +295,36 @@ def init_db():
 
     """)
 
+    # =====================================
+    # INDEXES
+    # =====================================
+    cur.execute("""
+
+        CREATE INDEX IF NOT EXISTS idx_universe_rankings_date
+
+        ON universe_rankings(snapshot_date)
+
+    """)
+
+    cur.execute("""
+
+        CREATE INDEX IF NOT EXISTS idx_universe_rankings_symbol
+
+        ON universe_rankings(symbol)
+
+    """)
+
+    cur.execute("""
+
+        CREATE INDEX IF NOT EXISTS idx_universe_rankings_symbol_date
+
+        ON universe_rankings(symbol, snapshot_date)
+
+    """)
 
 
-        # =====================================
+
+    # =====================================
     # ALERT HISTORY
     # =====================================
     cur.execute("""

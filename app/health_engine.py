@@ -28,20 +28,39 @@ MIN_CASH_PCT = 5
 # =====================================
 # BUILD HEALTH REPORT
 # =====================================
-def get_health_report():
+def get_health_report(
+
+    regime=None,
+    risk_report=None
+
+):
 
     logger.info(
         "Building health report..."
     )
 
-    risk_report = (
-        get_risk_report()
-    )
+    # =====================================
+    # REUSE PRECOMPUTED DEPENDENCIES
+    # =====================================
+    if risk_report is None:
 
-    regime_data = (
-        determine_market_regime()
-    )
+        risk_report = (
+            get_risk_report()
+        )
 
+    if regime is None:
+
+        regime_data = (
+            determine_market_regime()
+        )
+
+    else:
+
+        regime_data = regime
+
+    # =====================================
+    # LIVE PORTFOLIO
+    # =====================================
     live_portfolio = (
         get_live_portfolio()
     )
@@ -142,12 +161,15 @@ def get_health_report():
     # =====================================
     # REGIME CONFLICT
     # =====================================
-    regime = regime_data.get(
+    current_regime = regime_data.get(
+
         "regime",
+
         "UNKNOWN"
+
     )
 
-    if regime != "RISK_ON":
+    if current_regime != "RISK_ON":
 
         leveraged_symbols = [
 
@@ -265,11 +287,9 @@ def get_health_report():
             cash_pct,
 
         "regime":
-            regime
+            current_regime
 
     }
-
-
 # =====================================
 # RUN
 # =====================================

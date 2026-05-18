@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+
+    <h1>
+        📓 Trade Journal
+    </h1>
+
+</div>
+
+
+<!-- ===================================== -->
+<!-- JOURNAL TABLE -->
+<!-- ===================================== -->
+<div class="card" style="overflow-x:auto;">
+
+    <table class="data-table">
+
+        <thead>
+
+            <tr>
+
+                <th>Symbol</th>
+
+                <th>Entry Date</th>
+
+                <th>Exit Date</th>
+
+                <th>Shares</th>
+
+                <th>Entry</th>
+
+                <th>Exit</th>
+
+                <th>PnL</th>
+
+                <th>Hold Days</th>
+
+                <th>Regime In</th>
+
+                <th>Regime Out</th>
+
+                <th>Entry Score</th>
+
+                <th>Exit Score</th>
+
+                <th>Entry Rank</th>
+
+                <th>Exit Rank</th>
+
+                <th>Volatility</th>
+
+                <th>Exposure %</th>
+
+                <th>Cash %</th>
+
+                <th>Health Score</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for row in journal.itertuples() %}
+
+            <tr>
+
+                <!-- SYMBOL -->
+                <td>
+                    {{ row.symbol }}
+                </td>
+
+                <!-- ENTRY DATE -->
+                <td>
+                    {{ row.entry_date }}
+                </td>
+
+                <!-- EXIT DATE -->
+                <td>
+                    {{ row.exit_date or "-" }}
+                </td>
+
+                <!-- SHARES -->
+                <td>
+                    {{ row.shares }}
+                </td>
+
+                <!-- ENTRY PRICE -->
+                <td>
+                    ${{ "%.2f"|format(row.entry_price or 0) }}
+                </td>
+
+                <!-- EXIT PRICE -->
+                <td>
+
+                    {% if row.exit_price is not none %}
+
+                    ${{ "%.2f"|format(row.exit_price) }}
+
+                    {% else %}
+
+                    OPEN
+
+                    {% endif %}
+
+                </td>
+
+                <!-- REALIZED PNL -->
+                <td>
+
+                    {% if row.realized_pnl is not none %}
+
+                    {% if row.realized_pnl > 0 %}
+
+                    <span style="color:#00c853;">
+
+                        ${{ "%.2f"|format(row.realized_pnl) }}
+
+                    </span>
+
+                    {% elif row.realized_pnl < 0 %} <span style="color:#ff5252;">
+
+                        ${{ "%.2f"|format(row.realized_pnl) }}
+
+                        </span>
+
+                        {% else %}
+
+                        $0.00
+
+                        {% endif %}
+
+                        {% else %}
+
+                        OPEN
+
+                        {% endif %}
+
+                </td>
+
+                <!-- HOLD DAYS -->
+                <td>
+
+                    {% if row.holding_days is not none %}
+
+                    {{ row.holding_days }}
+
+                    {% else %}
+
+                    -
+
+                    {% endif %}
+
+                </td>
+
+                <!-- REGIME ENTRY -->
+                <td>
+
+                    {% if row.regime_entry == "RISK_ON" %}
+
+                    <span style="color:#00c853;">
+
+                        {{ row.regime_entry }}
+
+                    </span>
+
+                    {% else %}
+
+                    <span style="color:#ff5252;">
+
+                        {{ row.regime_entry }}
+
+                    </span>
+
+                    {% endif %}
+
+                </td>
+
+                <!-- REGIME EXIT -->
+                <td>
+
+                    {% if row.regime_exit is not none %}
+
+                    {% if row.regime_exit == "RISK_ON" %}
+
+                    <span style="color:#00c853;">
+
+                        {{ row.regime_exit }}
+
+                    </span>
+
+                    {% else %}
+
+                    <span style="color:#ff5252;">
+
+                        {{ row.regime_exit }}
+
+                    </span>
+
+                    {% endif %}
+
+                    {% else %}
+
+                    -
+
+                    {% endif %}
+
+                </td>
+
+                <!-- ENTRY SCORE -->
+                <td>
+
+                    {% if row.entry_score is not none %}
+
+                    {{ "%.2f"|format(row.entry_score) }}
+
+                    {% else %}
+
+                    -
+
+                    {% endif %}
+
+                </td>
+
+                <!-- EXIT SCORE -->
+                <td>
+
+                    {% if row.exit_score is not none %}
+
+                    {{ "%.2f"|format(row.exit_score) }}
+
+                    {% else %}
+
+                    -
+
+                    {% endif %}
+
+                </td>
+
+                <!-- ENTRY RANK -->
+                <td>
+
+                    {{ row.entry_rank or "-" }}
+
+                </td>
+
+                <!-- EXIT RANK -->
+                <td>
+
+                    {{ row.exit_rank or "-" }}
+
+                </td>
+
+                <!-- VOLATILITY -->
+                <td>
+
+                    {% if row.volatility_entry is not none %}
+
+                    {{ "%.2f"|format(row.volatility_entry) }}
+
+                    {% else %}
+
+                    -
+
+                    {% endif %}
+
+                </td>
+
+                <!-- EFFECTIVE EXPOSURE -->
+                <td>
+
+                    {{ "%.1f"|format(
+                    row.effective_exposure_entry or 0
+                    ) }}%
+
+                </td>
+
+                <!-- CASH % -->
+                <td>
+
+                    {{ "%.1f"|format(
+                    row.cash_pct_entry or 0
+                    ) }}%
+
+                </td>
+
+                <!-- HEALTH SCORE -->
+                <td>
+
+                    {{ row.health_score_entry or "-" }}
+
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

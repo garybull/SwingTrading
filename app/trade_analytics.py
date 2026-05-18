@@ -425,7 +425,15 @@ def get_trade_analytics():
             round(win_rate, 2),
 
         "profit_factor":
-            round(profit_factor, 2),
+
+        "∞"
+
+        if profit_factor == float("inf")
+
+        else round(
+            profit_factor,
+            2
+        ),
 
         "expectancy":
             round(expectancy, 2),

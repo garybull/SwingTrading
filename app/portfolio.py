@@ -400,6 +400,14 @@ def get_dashboard_data():
         get_equity_curve()
     )
 
+    equity_curve_json = (
+
+        equity_curve.to_dict(
+            orient="records"
+        )
+
+    )
+
     system_state = (
         get_system_state()
     )
@@ -475,6 +483,9 @@ def get_dashboard_data():
 
         "equity_curve":
             equity_curve,
+        
+        "equity_curve_json":
+            equity_curve_json,
 
         "system_state":
             system_state,

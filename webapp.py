@@ -8,8 +8,14 @@ from app.regime_engine import determine_market_regime
 from app.trading_cycle import (
     run_trading_cycle
 )
+from app.db_service import (
+    query_df
+)
 from app.health_engine import (
     get_health_report
+)
+from app.services.universe_watchlist_service import (
+    get_universe_watchlist
 )
 from app.alert_engine import (
     get_alert_report
@@ -147,17 +153,35 @@ def dashboard():
 
     regime = determine_market_regime()
 
+    watchlist = get_universe_watchlist()
+
+
     risk_report = (
         get_risk_report()
     )
     health_report = (
-        get_health_report()
+
+        get_health_report(
+
+            regime=regime,
+
+            risk_report=risk_report
+
+        )
+
     )
     drawdown_report = (
         get_drawdown_report()
     )
     alert_report = (
-        get_alert_report()
+
+        get_alert_report(
+
+            health_report=
+                health_report
+
+        )
+
     )
     suggested_exposure = (
         get_suggested_exposure()
@@ -183,6 +207,9 @@ def dashboard():
 
         equity_curve=
             data["equity_curve"],
+
+        equity_curve_json=
+            data["equity_curve_json"],
 
         system_state=
             data["system_state"],
@@ -213,7 +240,9 @@ def dashboard():
         drawdown_report=
             drawdown_report,
         alert_report=
-            alert_report
+            alert_report,
+        watchlist=
+            watchlist
 
     )
 
@@ -551,7 +580,33 @@ def benchmarks():
         drawdown_chart=drawdown_chart
 
     )
+# =====================================
+# TRADE JOURNAL
+# =====================================
+@app.route("/trade_journal")
+def trade_journal():
 
+    logger.info(
+        "Loading trade journal..."
+    )
+
+    journal = query_df("""
+
+        SELECT *
+
+        FROM trade_journal
+
+        ORDER BY id DESC
+
+    """)
+
+    return render_template(
+
+        "trade_journal.html",
+
+        journal=journal
+
+    )
 # =====================================
 # Recommendations
 # =====================================
